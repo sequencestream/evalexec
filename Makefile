@@ -16,9 +16,10 @@ LDFLAGS := -s -w \
 # aimodel plus one JSON Schema library, and that budget is now spent.
 ALLOWED_DEPS := github.com/vogo/aimodel github.com/santhosh-tekuri/jsonschema/v6
 
-.PHONY: all build test test-e2e lint lint-terms lint-boundary lint-secrets check-deps apidiff fmt tidy clean
+.PHONY: all build test test-e2e test-protocol test-consumer lint lint-terms lint-boundary \
+	lint-secrets check-deps apidiff fmt tidy clean
 
-all: build test lint
+all: build test test-protocol test-consumer lint
 
 build:
 	@mkdir -p bin
@@ -27,10 +28,27 @@ build:
 test:
 	go test -race ./...
 
-# Real-model end-to-end tests. Needs OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_MODEL;
-# individual tests skip themselves when those are unset.
+# Real-model end-to-end tests, which live in e2e/ behind a build tag so they
+# cannot run by accident: they need credentials and they cost money. Each test
+# skips itself when the environment is unset, so this passes on a machine with
+# no credentials rather than failing in a way that looks like a defect.
+#
+# Needs OPENAI_BASE_URL, OPENAI_API_KEY and OPENAI_MODEL.
 test-e2e:
-	go test -tags e2e -count=1 -v ./...
+	go test -tags e2e -count=1 -v ./e2e/...
+
+# Acceptance criterion 21: the protocol must be checkable without Go. The
+# self-test runs first, because a checker that cannot fail proves nothing about
+# the fixtures it just accepted.
+test-protocol:
+	python3 contract/verify_fixtures.py --self-test
+	python3 contract/verify_fixtures.py fixtures/data
+
+# The downstream smoke test. Its own module, because an examples/ directory
+# inside this one would only prove the code compiles — not that everything a
+# downstream program needs is exported.
+test-consumer:
+	cd examples/consumer && go run .
 
 # The golangci-lint call must not be chained with `|| echo`: a lint failure
 # would then be swallowed as "not installed" and the target would still
@@ -64,9 +82,10 @@ lint-terms:
 # inside a host process.
 #
 # Standalone programs are exempt, because that is precisely where these belong:
-# cmd/ is the binary, and contract/ holds the reference external components,
-# which are separate processes by definition. Test files are exempt too (M5
-# drives a real subprocess to exercise SIGINT).
+# cmd/ is the binary, contract/ holds the reference external components, and
+# examples/ holds the downstream smoke test — the last two are separate
+# processes, and examples/consumer is a separate module besides. Test files are
+# exempt too (M5 drives a real subprocess to exercise SIGINT).
 #
 # This is the cheap pre-check, available without golangci-lint. The
 # authoritative check is the forbidigo linter in .golangci.yml, which works on
@@ -76,7 +95,7 @@ lint-terms:
 # line-based, so a `//` inside a string literal truncates the rest of that
 # line; forbidigo is what closes that gap.
 lint-boundary:
-	@files=$$(git ls-files --cached --others --exclude-standard '*.go' | grep -vE '^cmd/|^contract/' | grep -v '_test\.go$$' | while read -r f; do [ -f "$$f" ] && echo "$$f"; done); \
+	@files=$$(git ls-files --cached --others --exclude-standard '*.go' | grep -vE '^cmd/|^contract/|^examples/' | grep -v '_test\.go$$' | while read -r f; do [ -f "$$f" ] && echo "$$f"; done); \
 	if [ -z "$$files" ]; then echo "lint-boundary: ok (no files)"; exit 0; fi; \
 	hits=$$(for f in $$files; do \
 		sed 's|//.*||' "$$f" | grep -nE 'os\.Exit|signal\.Notify|os\.Stderr' | sed "s|^|$$f:|"; \
@@ -97,6 +116,8 @@ lint-boundary:
 lint-secrets:
 	go test -count=1 -run 'TestNoSecretReachesTheResultDirectory|TestLeakScannerActuallyFires' -v .
 
+# The consumer example has its own go.mod and is checked by its own CI step;
+# this looks only at the main module.
 check-deps:
 	@deps=$$(go list -m -f '{{if not .Indirect}}{{.Path}}{{end}}' all 2>/dev/null | grep -v '^$(MODULE)$$' | grep -v '^std$$' | grep -v '^$$'); \
 	for d in $$deps; do \

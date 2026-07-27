@@ -17,11 +17,14 @@ evalexec \
 
 ## 状态
 
-**开发中。** 按 `doc/dev-plan.md` 的 M0–M7 推进，当前完成到 **M6**。
+**M0–M7 全部完成**，`doc/dev-plan.md` 的规划已走完。
 
-功能面已完整：规则 Grader、LLM Judge、并发与中断、外部 Grader / Judge 协议。
-已对 DeepSeek 真实端点做过端到端验证，也验证过同一组 fixture 在 Go 与 Python
-外部实现下判决一致。M7 做跨语言协议校验脚本与双形态发布。
+21 条验收标准逐条对应到具体测试函数，见 [doc/acceptance.md](./doc/acceptance.md)。
+已对 DeepSeek 真实端点做过端到端验证；同一组 fixture 在 Go 与 Python 的外部实现下
+判决一致，且结果文档可由一个纯标准库的 Python 脚本独立校验。
+
+尚未打 tag：发布是仓库所有者的决定，不是开发阶段的动作。`goreleaser` 配置与
+`examples/consumer` 冒烟仓库已就绪并在 CI 中验证。
 
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
@@ -32,7 +35,7 @@ evalexec \
 | M4 | aimodel Judge 接入 + `llm_judge` | ✅ |
 | M5 | 并发、超时、fail-fast、中断、`skipped` 补写 | ✅ |
 | M6 | 外部 Grader / Judge 协议互操作 | ✅ |
-| M7 | 跨语言一致性验证、二进制与库双发布 | ⏳ |
+| M7 | 跨语言一致性验证、二进制与库双发布 | ✅ |
 
 ## 两个交付物
 
@@ -162,21 +165,98 @@ Python 版不是示范代码，而是「协议不绑定语言」这条边界的*
 共享进程会让对话交错。超时或崩溃后 kill **进程组**而非进程 —— 脚本自己 fork 的子进程
 否则会留下孤儿，而一个还握着管道的孤儿与"尚未应答的进程"无法区分。
 
-## 注册自定义 Grader
+## 作为库使用
 
-下游程序可以注册自己的 Grader，用 `protocol: "builtin"` + 自定义 `entry` 直接跑，
-不必走子进程：
+`Run` 就是全部接口。它和命令行一样是一次原子调用，而不是让调用方自己去拼
+校验、读数据集、派发、汇总与写结果五个包：
 
 ```go
-grader.Register("my_grader", func(spec evalspec.GraderSpec) (grader.Grader, error) {
-    return &myGrader{}, nil
-})
-
 result, err := evalexec.Run(ctx, request)
 ```
 
-这不扩大 `evalexec` 二进制的能力面 —— 它只注册内置的五个 entry；自定义 entry 只在
+三段可运行示例在 [`examples/consumer/`](./examples/consumer/)（**独立 module**）。
+README 引用它而不是复制 —— 复制的示例会腐烂。
+
+### 1. 跑一次评估
+
+```go
+req := &evalspec.EvalRequest{
+    SpecVersion: evalspec.SpecVersion,
+    TaskID:      "consumer-smoke",
+    Dataset:     evalspec.Dataset{Path: dataset},
+    Grader: evalspec.GraderSpec{
+        ID: "order-status", Version: "v1",
+        Protocol: evalspec.GraderBuiltin, Entry: "exact_match",
+        Requires: []evalspec.SessionField{
+            evalspec.FieldInput, evalspec.FieldOutput, evalspec.FieldReference,
+        },
+    },
+    OutputDir: outDir,
+}
+
+res, err := evalexec.Run(context.Background(), req)
+```
+
+`eval_id` 缺省时由 `Run` 生成，所以不关心关联的调用方可以不填。
+
+### 2. 注册自己的 Grader
+
+```go
+registry := grader.NewRegistry()
+
+registry.Register("answer_length", func(spec evalspec.GraderSpec, _ grader.Deps) (grader.Grader, error) {
+    return &lengthGrader{maxRunes: 20}, nil
+})
+
+res, err := evalexec.Run(ctx, req, evalexec.WithGraderRegistry(registry))
+```
+
+用 `protocol: "builtin"` + 自定义 `entry` 直接跑，不必走子进程。
+**`builtin` 不等于"内置的那五个"** —— 它指"编译进二进制里的 Grader"，包括下游注册的。
+
+这不扩大 `evalexec` 二进制的能力面：它只注册内置的五个 entry，自定义 entry 只在
 下游自己构建的二进制里可见。
+
+### 3. 用共享 fixtures 自测你的 Grader
+
+```go
+data, _ := fixtures.Read(fixtures.CaseMixedSuccessFail, fixtures.FileDataset)
+
+for _, line := range fixtures.Lines(data) {
+    var session evalspec.Session
+    json.Unmarshal([]byte(line), &session)
+
+    // 与宿主执行的是同一个检查，且关注的是"键是否存在"：
+    // 显式为 null 的字段算存在。
+    if missing := session.MissingFields(g.Declare().Requires); len(missing) > 0 {
+        // ...
+    }
+
+    call := evalspec.NewGradeCall("selftest", "consumer", &session, nil)
+    eval, _ := g.Grade(ctx, call)
+}
+```
+
+fixtures 就是为此发布的：EvalExec 用来自测的同一份数据，通过 `embed.FS` 取用，
+下游不必自己抄一份。
+
+### `Run` 的几条承诺
+
+- 前置校验全部通过之前**不写任何东西**；被拒绝的运行不留目录，临时目录也不留。
+- 结果目录**一次出现或完全不出现**（发布是一次 `rename`）。
+- `records.jsonl` 每条数据集行恰好一行，**在每一条退出路径上**。
+- 失败的评估**永不记成 0 分**。
+- 诊断默认走 `io.Discard`：库不该假设自己拥有宿主进程的 stderr。用
+  `WithDiagnosticWriter` 显式指定。
+
+### 版本与兼容性
+
+| 协议版本 | Go 模块版本 | 承诺 |
+|---|---|---|
+| `evalexec/v1alpha1` | `v0.x` | 协议内只增可选字段；Go API 按 §稳定性分层，L3/L4 可变 |
+| `evalexec/v1alpha1` | `v1.x` | Go API 遵守兼容性承诺；`gorelease` 从 advisory 转硬失败 |
+
+删字段、改类型或改状态含义 = 提协议版本 + 提 major。
 
 ## 开发
 

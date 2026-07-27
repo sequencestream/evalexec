@@ -73,6 +73,7 @@ func (systemClock) Now() time.Time { return time.Now() }
 type config struct {
 	registry  *grader.Registry
 	clock     Clock
+	ids       IDGenerator
 	diag      io.Writer
 	judge     validate.JudgeChecker
 	debugLogs bool
@@ -97,6 +98,16 @@ func WithClock(clk Clock) Option {
 	return func(c *config) {
 		if clk != nil {
 			c.clock = clk
+		}
+	}
+}
+
+// WithIDGenerator supplies the source of a generated eval_id, so a golden-file
+// test can pin one.
+func WithIDGenerator(g IDGenerator) Option {
+	return func(c *config) {
+		if g != nil {
+			c.ids = g
 		}
 	}
 }
@@ -192,9 +203,26 @@ func (r *graderResolver) Resolve(spec evalspec.GraderSpec) (declaration.Declarat
 // run-level fault it returns both a result carrying status "failed" and an
 // error, so a caller has the diagnosis as well as whatever was learned.
 func Run(ctx context.Context, req *evalspec.EvalRequest, opts ...Option) (*evalspec.EvalResult, error) {
-	cfg := &config{registry: grader.Default(), clock: systemClock{}, diag: io.Discard}
+	cfg := &config{
+		registry: grader.Default(), clock: systemClock{},
+		ids: UUIDv7Generator{}, diag: io.Discard,
+	}
+
 	for _, o := range opts {
 		o(cfg)
+	}
+
+	// Every result must carry a non-empty eval_id. Generating it here rather
+	// than only in the CLI is what makes that true for a library caller too:
+	// omitting it would otherwise produce a result that fails its own
+	// validation, which the downstream smoke test caught immediately.
+	if req.EvalID == "" {
+		id, err := cfg.ids.NewID()
+		if err != nil {
+			return nil, evalerr.Wrap(evalerr.KindArgument, validate.StepArguments, err, "")
+		}
+
+		req.EvalID = id
 	}
 
 	report, err := validate.All(req, validate.Options{
@@ -291,6 +319,7 @@ func execute(
 	}
 
 	logs := result.NewLogWriter(dir)
+	errorLog := result.NewErrorLog(dir)
 
 	outcome, runErr := runner.Run(ctx, runner.Config{
 		EvalID:        req.EvalID,
@@ -308,6 +337,7 @@ func execute(
 		Logs:          logs,
 		KeepAllLogs:   cfg.debugLogs,
 		Diag:          cfg.diag,
+		Errors:        &errorRecorder{log: errorLog, clock: cfg.clock},
 	}, records)
 
 	if closeErr := records.Close(); closeErr != nil && runErr == nil {
@@ -337,7 +367,7 @@ func execute(
 		Status:      status,
 		StopReason:  stopReason,
 		Request:     snapshot.JSON,
-		Artifacts:   artifactsOf(logs),
+		Artifacts:   artifactsOf(logs, errorLog),
 		Counts:      outcome.Counts,
 		Evaluation:  outcome.Evaluation,
 		Usage: evalspec.ResultUsage{JudgeModel: evalspec.ModelUsage{
@@ -369,7 +399,29 @@ func execute(
 		return res, err
 	}
 
+	if err := errorLog.Flush(); err != nil {
+		// A diagnostic that could not be written must not sink the run: the
+		// result itself is unaffected.
+		_, _ = fmt.Fprintf(cfg.diag, "evalexec: cannot write %s: %v\n", result.FileErrors, err)
+	}
+
 	return res, nil
+}
+
+// errorRecorder adapts the result package's error log to what the runner needs,
+// stamping each entry with the run's clock.
+type errorRecorder struct {
+	log   *result.ErrorLog
+	clock Clock
+}
+
+func (r *errorRecorder) Record(stage, caseID, message string) {
+	r.log.Record(result.Entry{
+		At:      evalspec.NewTimestamp(r.clock.Now()),
+		Stage:   stage,
+		CaseID:  caseID,
+		Message: message,
+	})
 }
 
 // buildGrader constructs the Grader for a request.
@@ -392,10 +444,15 @@ func buildGrader(cfg *config, req *evalspec.EvalRequest, j judge.Judge) (grader.
 // artifactsOf names the files a run produced. The logs directory is listed
 // only when something was written to it: naming an absent directory would send
 // a reader looking for diagnostics that do not exist.
-func artifactsOf(logs *result.LogWriter) evalspec.Artifacts {
+func artifactsOf(logs *result.LogWriter, errorLog *result.ErrorLog) evalspec.Artifacts {
 	a := evalspec.Artifacts{Records: result.FileRecords}
+
 	if logs.HasLogs() {
 		a.Logs = result.DirLogs
+	}
+
+	if errorLog.Len() > 0 {
+		a.Errors = result.FileErrors
 	}
 
 	return a

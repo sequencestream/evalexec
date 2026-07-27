@@ -88,6 +88,15 @@ type Config struct {
 	KeepAllLogs bool
 	// Diag receives progress notes; nil discards them.
 	Diag io.Writer
+	// Errors, when set, collects run-level diagnostics that have nowhere else
+	// to go. In library mode Diag defaults to io.Discard, so without this those
+	// events would vanish entirely.
+	Errors ErrorRecorder
+}
+
+// ErrorRecorder collects a run-level diagnostic.
+type ErrorRecorder interface {
+	Record(stage, caseID, message string)
 }
 
 func (c Config) concurrency() int {
@@ -202,7 +211,7 @@ func Run(ctx context.Context, cfg Config, records io.Writer) (*Outcome, error) {
 	}
 
 	inflight := newInflightSet()
-	dispatchErr := dispatch(ctx, workerCtx, reader, jobs, inflight, st)
+	dispatchErr := dispatch(ctx, workerCtx, cfg, reader, jobs, inflight, st)
 
 	close(jobs)
 	workers.Wait()
@@ -246,6 +255,7 @@ func Run(ctx context.Context, cfg Config, records io.Writer) (*Outcome, error) {
 // exhausted or the run stops.
 func dispatch(
 	ctx, workerCtx context.Context,
+	cfg Config,
 	reader *dataset.Reader,
 	jobs chan<- job,
 	inflight *inflightSet,
@@ -273,6 +283,10 @@ func dispatch(
 			// The dataset validated cleanly moments ago, so a parse failure
 			// now means it changed underneath the run — a run-level fault,
 			// not a per-sample one.
+			if errorsOf(cfg) != nil {
+				errorsOf(cfg).Record("dispatch", "", err.Error())
+			}
+
 			return evalerr.Wrap(evalerr.KindRuntime, StepRun, err,
 				"the dataset changed while the run was in progress")
 		}
@@ -379,6 +393,10 @@ func backfill(cfg Config, w *writer, reader *dataset.Reader, inflight *inflightS
 			}
 
 			if err != nil {
+				if cfg.Errors != nil {
+					cfg.Errors.Record("backfill", "", err.Error())
+				}
+
 				return evalerr.Wrap(evalerr.KindRuntime, StepRun, err,
 					"cannot finish reading the dataset to backfill skipped records")
 			}
@@ -415,6 +433,9 @@ func backfill(cfg Config, w *writer, reader *dataset.Reader, inflight *inflightS
 
 	return nil
 }
+
+// errorsOf returns the run's diagnostic recorder, or nil.
+func errorsOf(cfg Config) ErrorRecorder { return cfg.Errors }
 
 // writer owns records.jsonl and the running totals.
 type writer struct {
@@ -498,5 +519,9 @@ func (w *writer) retainLogs(rec *evalspec.Record) {
 		// A diagnostic that could not be written is worth mentioning but must
 		// not fail the run: the result itself is unaffected.
 		_, _ = fmt.Fprintf(w.cfg.Diag, "evalexec: cannot write logs for %s: %v\n", rec.CaseID, err)
+
+		if w.cfg.Errors != nil {
+			w.cfg.Errors.Record("logs", rec.CaseID, err.Error())
+		}
 	}
 }

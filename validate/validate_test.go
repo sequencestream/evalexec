@@ -9,6 +9,7 @@ import (
 
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/evalspec"
+	"github.com/sequencestream/evalexec/grader/declaration"
 	"github.com/sequencestream/evalexec/validate"
 )
 
@@ -451,5 +452,46 @@ func TestNoDirectoryIsCreated(t *testing.T) {
 		if strings.Contains(e.Name(), ".tmp-") {
 			t.Errorf("validation left a temporary directory behind: %s", e.Name())
 		}
+	}
+}
+
+// TestUndeclaredParamsAreNotPoliced pins the distinction between a Grader that
+// declares no parameters and one that declares an empty list.
+//
+// A downstream Grader that has not declared its parameter names should not have
+// every parameter rejected with a message reading "accepts []" — that failure
+// mode was found by the downstream smoke test in M7. Declaring the list buys
+// the misspelling check; leaving it nil gives that up, which is the author's
+// choice to make.
+func TestUndeclaredParamsAreNotPoliced(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  []string
+		wantErr bool
+	}{
+		{name: "nil means unchecked", params: nil, wantErr: false},
+		{name: "empty means none accepted", params: []string{}, wantErr: true},
+		{name: "declared and matching", params: []string{"knob"}, wantErr: false},
+		{name: "declared and mismatched", params: []string{"other"}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			decl := declaration.Declaration{
+				Entry:    "custom",
+				Requires: []evalspec.SessionField{evalspec.FieldInput},
+				Params:   tt.params,
+			}
+
+			_, err := decl.EffectiveRequires(map[string]any{"knob": true})
+
+			if tt.wantErr && err == nil {
+				t.Error("EffectiveRequires returned nil, want an error")
+			}
+
+			if !tt.wantErr && err != nil {
+				t.Errorf("EffectiveRequires: %v", err)
+			}
+		})
 	}
 }

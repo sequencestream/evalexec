@@ -43,10 +43,16 @@ type Declaration struct {
 	Requires []evalspec.SessionField
 	// RequiresJudge says whether a judge_model must be configured.
 	RequiresJudge bool
-	// Params names the parameters this Grader understands. A parameter
-	// outside this set is an error rather than a silent no-op: a misspelled
-	// rubric key that is quietly ignored produces a run that looks fine and
-	// graded the wrong thing.
+	// Params names the parameters this Grader understands. A parameter outside
+	// the set is an error rather than a silent no-op: a misspelled rubric key
+	// that is quietly ignored produces a run which looks fine and graded the
+	// wrong thing.
+	//
+	// A nil Params means the Grader does not police its parameters, and any key
+	// is passed through. An empty non-nil Params means it accepts none. The
+	// distinction matters for a Grader written downstream: declaring the list is
+	// worth doing, but a Grader that has not declared one should not have every
+	// parameter rejected with a message reading "accepts []".
 	Params []string
 	// Optional lists parameters that may extend Requires, described by which
 	// field each one adds when true.
@@ -155,7 +161,7 @@ func (d Declaration) EffectiveRequires(params map[string]any) ([]evalspec.Sessio
 }
 
 func (d Declaration) checkParams(params map[string]any) error {
-	if len(params) == 0 {
+	if len(params) == 0 || d.Params == nil {
 		return nil
 	}
 

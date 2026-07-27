@@ -1,0 +1,58 @@
+# goreleaser configuration for the evalexec binary.
+#
+# The library half of the release needs nothing here: a Go module is published
+# by tagging it. This file covers the binary, and the version it stamps is the
+# same value provenance.implementation.version reports — a result must be
+# traceable to the build that produced it.
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: evalexec
+    main: ./cmd/evalexec
+    binary: evalexec
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/sequencestream/evalexec/version.Version={{.Version}}
+      - -X github.com/sequencestream/evalexec/version.Commit={{.ShortCommit}}
+      - -X github.com/sequencestream/evalexec/version.Date={{.CommitDate}}
+    # CommitDate rather than the build time: two builds of the same commit
+    # should stamp the same version, or provenance stops identifying a build and
+    # starts identifying a moment.
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+      # The fixtures travel with the release so an implementer in another
+      # language can self-test without cloning the repository.
+      - fixtures/data/**/*
+      - contract/README.md
+
+checksums:
+  name_template: checksums.txt
+
+changelog:
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - "^doc:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  prerelease: auto
