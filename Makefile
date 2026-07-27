@@ -63,10 +63,20 @@ lint-terms:
 # cmd/ that exits the process, grabs signals, or writes to os.Stderr would
 # misbehave inside a host process. Test files are exempt (M5 drives a real
 # subprocess to test SIGINT).
+#
+# This is the cheap pre-check, available without golangci-lint. The
+# authoritative check is the forbidigo linter in .golangci.yml, which works on
+# the AST. Comments are stripped first because a doc comment explaining the
+# rule is not a violation of it — that false positive would pressure us to
+# leave the rule undocumented, which is exactly backwards. Stripping is
+# line-based, so a `//` inside a string literal truncates the rest of that
+# line; forbidigo is what closes that gap.
 lint-boundary:
 	@files=$$(git ls-files --cached --others --exclude-standard '*.go' | grep -v '^cmd/' | grep -v '_test\.go$$'); \
 	if [ -z "$$files" ]; then echo "lint-boundary: ok (no files)"; exit 0; fi; \
-	hits=$$(grep -InE 'os\.Exit|signal\.Notify|os\.Stderr' $$files 2>/dev/null); \
+	hits=$$(for f in $$files; do \
+		sed 's|//.*||' "$$f" | grep -nE 'os\.Exit|signal\.Notify|os\.Stderr' | sed "s|^|$$f:|"; \
+	done); \
 	if [ -n "$$hits" ]; then \
 		echo "lint-boundary: os.Exit / signal.Notify / os.Stderr are only allowed under cmd/:"; \
 		echo "$$hits"; \

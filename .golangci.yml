@@ -12,6 +12,7 @@ linters:
     - bodyclose
     - copyloopvar
     - errorlint
+    - forbidigo
     - gocritic
     - goconst
     - misspell
@@ -24,6 +25,20 @@ linters:
   settings:
     errcheck:
       check-type-assertions: true
+
+    # The library-path boundary, checked on the AST rather than by grepping.
+    # evalexec ships as a library as well as a binary, so anything outside
+    # cmd/ that exits the process, grabs signals, or writes to os.Stderr would
+    # respectively kill, hijack and pollute a host process that embedded it.
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: '^os\.Exit$'
+          msg: only cmd/evalexec may exit the process; library code returns an error
+        - pattern: '^signal\.Notify$'
+          msg: only cmd/evalexec may install signal handlers; library code takes a context
+        - pattern: '^os\.Stderr$'
+          msg: library code must write diagnostics to an injected io.Writer, not os.Stderr
     revive:
       rules:
         - name: exported
@@ -41,6 +56,14 @@ linters:
           - errcheck
           - goconst
           - noctx
+      # The binary is where exiting, signal handling and stderr belong.
+      - path: ^cmd/
+        linters:
+          - forbidigo
+      # Tests drive a real subprocess to exercise interrupt handling.
+      - path: _test\.go
+        linters:
+          - forbidigo
 
 formatters:
   enable:

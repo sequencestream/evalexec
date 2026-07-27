@@ -9,11 +9,16 @@
 package main
 
 import (
-	"flag"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"slices"
 
+	"github.com/sequencestream/evalexec/cli"
+	"github.com/sequencestream/evalexec/evalerr"
+	"github.com/sequencestream/evalexec/exitcode"
+	"github.com/sequencestream/evalexec/validate"
 	"github.com/sequencestream/evalexec/version"
 )
 
@@ -24,25 +29,44 @@ func main() {
 // run holds the real body so tests can drive it without exiting the process.
 // It returns the exit code instead of calling os.Exit.
 func run(args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("evalexec", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-
-	showVersion := fs.Bool("version", false, "print version and exit")
-
-	if err := fs.Parse(args); err != nil {
-		// flag already reported the error to stderr.
-		return 2
-	}
-
-	if *showVersion {
+	// --version is handled before parsing so it works on its own, without the
+	// otherwise mandatory flags.
+	if slices.Contains(args, "--version") || slices.Contains(args, "-version") {
 		_, _ = fmt.Fprintln(stdout, version.String())
 
-		return 0
+		return exitcode.OK
 	}
 
-	// M0 has no evaluation pipeline yet; M2 replaces this with the real
-	// argument parsing and M3 wires in evalexec.Run.
-	_, _ = fmt.Fprintln(stderr, "evalexec: not implemented yet; use --version")
+	req, err := cli.Parse(args, stderr, cli.Options{})
+	if err != nil {
+		return report(stderr, err)
+	}
 
-	return 2
+	if _, err := validate.All(req, validate.Options{Diag: stderr}); err != nil {
+		return report(stderr, err)
+	}
+
+	// M3 replaces this with a call to evalexec.Run.
+	_, _ = fmt.Fprintln(stderr, "evalexec: pre-checks passed; evaluation lands in M3")
+
+	return exitcode.OK
+}
+
+// report writes a diagnostic and returns the exit code for err.
+//
+// The step name is included because it tells a user which of the six ordered
+// pre-checks rejected the run, and the ordering itself carries meaning: a
+// directory conflict reported before a dataset error is not an arbitrary
+// choice.
+func report(stderr io.Writer, err error) int {
+	// Something has already told the user about this one — the flag package
+	// prints its own complaint before returning.
+	var e *evalerr.Error
+	if errors.As(err, &e) && e.Reported {
+		return exitcode.FromError(err)
+	}
+
+	_, _ = fmt.Fprintf(stderr, "evalexec: %s\n", err)
+
+	return exitcode.FromError(err)
 }

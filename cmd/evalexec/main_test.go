@@ -40,17 +40,24 @@ func TestRunUnknownFlagIsArgumentError(t *testing.T) {
 	}
 }
 
-func TestRunWithoutArgsIsNotImplementedYet(t *testing.T) {
+// TestRunWithoutArgsReportsEveryMissingField checks that an empty invocation
+// is rejected with the full list of what it lacked, rather than one field at
+// a time across eight retries.
+func TestRunWithoutArgsReportsEveryMissingField(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	// M0 has no pipeline. This test is expected to change in M2, when real
-	// argument validation takes over.
 	if code := run(nil, &stdout, &stderr); code != 2 {
 		t.Errorf("exit code = %d, want 2", code)
 	}
 
-	if !strings.Contains(stderr.String(), "not implemented") {
-		t.Errorf("stderr = %q, want a not-implemented notice", stderr.String())
+	for _, want := range []string{"task_id", "dataset.path", "output_dir", "grader.id", "grader.requires"} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Errorf("stderr does not mention %q:\n%s", want, stderr.String())
+		}
+	}
+
+	if stdout.Len() != 0 {
+		t.Errorf("stdout must stay clean, got %q", stdout.String())
 	}
 }
 
