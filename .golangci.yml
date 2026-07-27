@@ -1,0 +1,56 @@
+version: "2"
+
+run:
+  timeout: 5m
+  # Keep the e2e-tagged files in scope so they are linted like everything else.
+  build-tags:
+    - e2e
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - copyloopvar
+    - errorlint
+    - gocritic
+    - goconst
+    - misspell
+    - nilerr
+    - noctx
+    - revive
+    - unconvert
+    - wsl_v5
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - disableStutteringCheck
+    goconst:
+      min-occurrences: 4
+
+  exclusions:
+    rules:
+      # Test helpers legitimately repeat literals and skip error checks on
+      # cleanup paths.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - goconst
+          - noctx
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/sequencestream/evalexec
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
