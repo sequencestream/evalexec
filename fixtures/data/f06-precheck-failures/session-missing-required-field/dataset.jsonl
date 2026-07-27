@@ -1,0 +1,2 @@
+{"case_id":"case-001","input":{"q":1},"output":{"a":1},"reference":{"expected_output":{"a":1}}}
+{"case_id":"case-002","input":{"q":2},"reference":{"expected_output":{"a":2}}}

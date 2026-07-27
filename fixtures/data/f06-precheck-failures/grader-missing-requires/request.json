@@ -1,0 +1,8 @@
+{
+  "spec_version": "evalexec/v1alpha1",
+  "task_id": "t",
+  "dataset": {"path": "dataset.jsonl"},
+  "grader": {"id": "g", "version": "v1", "protocol": "builtin", "entry": "exact_match",
+             "requires_judge": false},
+  "output_dir": "out"
+}

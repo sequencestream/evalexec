@@ -1,0 +1,29 @@
+{
+  "spec_version": "evalexec/v1alpha1",
+  "eval_id": "fixture-f03",
+  "task_id": "order-agent-faithfulness",
+  "status": "completed",
+  "stop_reason": null,
+  "request": {},
+  "artifacts": {"records": "records.jsonl"},
+  "counts": {"total": 3, "completed": 3, "skipped": 0},
+  "evaluation": {
+    "grader_id": "answer-faithfulness",
+    "grader_version": "v1",
+    "evaluated": 3,
+    "success": 2,
+    "fail": 1,
+    "fail_by_code": {"insufficient_evidence": 1},
+    "score": {"count": 2, "mean": 0.5, "min": 0, "max": 1}
+  },
+  "usage": {"judge_model": {"input_tokens": 2360, "output_tokens": 207}},
+  "provenance": {
+    "dataset_sha256": "18961074fe43c72a88746a7492d7871a29555ce9d85e9808b08b65b23f7b93d0",
+    "eval_request_sha256": "<eval-request-sha256>",
+    "implementation": {"name": "evalexec", "version": "<version>"}
+  },
+  "started_at": "2026-07-27T01:00:00Z",
+  "finished_at": "2026-07-27T01:00:03Z",
+  "duration_ms": 3000,
+  "error": null
+}

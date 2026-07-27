@@ -1,0 +1,5 @@
+{"case_id":"case-001","input":{"q":"ORD-001"},"output":{"status":"shipping"},"reference":{"expected_output":{"status":"shipping"}}}
+{"case_id":"case-002","input":{"q":"ORD-002"},"output":{"status":"shipping"},"reference":{"note":"上游未提供期望输出"}}
+{"case_id":"case-003","input":{"q":"ORD-003"},"output":{"status":"delivered"},"reference":{"expected_output":{"status":"delivered"}}}
+{"case_id":"case-004","input":{"q":"ORD-004"},"output":{"status":"pending"},"reference":{"expected_output":{"status":"pending"}}}
+{"case_id":"case-005","input":{"q":"ORD-005"},"output":{"status":"cancelled"},"reference":{"expected_output":{"status":"cancelled"}}}

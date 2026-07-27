@@ -1,0 +1,8 @@
+{"case_id":"case-001","input":{"q":"ORD-001"},"output":{"status":"shipping"},"reference":{"expected_output":{"status":"shipping"}}}
+{"case_id":"case-002","input":{"q":"ORD-002"},"output":{"status":"shipping"},"reference":{"expected_output":{"status":"shipping"}}}
+{"case_id":"case-003","input":{"q":"ORD-003"},"output":{"status":"shipping"},"reference":{"expected_output":{"status":"shipping"}}}
+{"case_id":"case-004","input":{"q":"ORD-004"},"output":{"status":"shipping"},"reference":{"expected_output":{"status":"shipping"}}}
+{"case_id":"case-005","input":{"q":"ORD-005"},"output":{"status":"shipping"},"reference":{"expected_output":{"status":"shipping"}}}
+{"case_id":"case-006","input":{"q":"ORD-006"},"output":{"status":"shipping"},"reference":{"expected_output":{"status":"shipping"}}}
+{"case_id":"case-007","input":{"q":"ORD-007"},"output":{"status":"shipping"},"reference":{"expected_output":{"status":"shipping"}}}
+{"case_id":"case-008","input":{"q":"ORD-008"},"output":{"status":"shipping"},"reference":{"expected_output":{"status":"shipping"}}}

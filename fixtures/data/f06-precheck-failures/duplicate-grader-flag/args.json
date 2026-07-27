@@ -1,0 +1,4 @@
+{
+  "note": "Two --grader flags. The standard flag package would silently keep the last one; the CLI must count occurrences and reject.",
+  "argv": ["--task-id", "t", "--dataset", "dataset.jsonl", "--grader", "a.json", "--grader", "b.json", "--output-dir", "out"]
+}

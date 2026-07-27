@@ -1,0 +1,16 @@
+{
+  "spec_version": "evalexec/v1alpha1",
+  "eval_id": "fixture-f04",
+  "task_id": "order-agent-regression",
+  "dataset": {"path": "dataset.jsonl"},
+  "grader": {
+    "id": "order-status-exact",
+    "version": "v1",
+    "protocol": "builtin",
+    "entry": "exact_match",
+    "requires": ["input", "output", "reference"],
+    "requires_judge": false
+  },
+  "execution": {"concurrency": 1, "fail_fast": true},
+  "output_dir": "out"
+}

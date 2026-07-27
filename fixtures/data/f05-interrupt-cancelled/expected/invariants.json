@@ -1,0 +1,14 @@
+{
+  "exit_code": 130,
+  "result_directory_optional": true,
+  "when_published": {
+    "status": "cancelled",
+    "stop_reason": "interrupt",
+    "counts": {"total": 8},
+    "record_count": 8,
+    "sequences": "1..8 exactly once each",
+    "skipped_min": 1,
+    "no_fail_records": true,
+    "skipped_error": {"code": "skipped", "reason": "interrupt"}
+  }
+}

@@ -1,0 +1,4 @@
+{"case_id":"case-001","input":{"messages":[{"role":"user","content":"查询订单 ORD-123"}]},"output":{"status":"shipping"},"reference":{"expected_output":{"status":"shipping"}}}
+{"case_id":"case-002","input":{"messages":[{"role":"user","content":"查询订单 ORD-456"}]},"output":{"status":"pending"},"reference":{"expected_output":{"status":"delivered"}}}
+{"case_id":"case-003","input":{"messages":[{"role":"user","content":"查询订单 ORD-789"}]},"output":{"status":"shipping"},"reference":{"note":"上游未提供期望输出"}}
+{"case_id":"case-004","input":{"messages":[{"role":"user","content":"查询订单 ORD-999"}]},"output":{"status":"delivered"},"reference":{"expected_output":{"status":"delivered"}}}

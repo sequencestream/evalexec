@@ -32,10 +32,15 @@ test:
 test-e2e:
 	go test -tags e2e -count=1 -v ./...
 
+# The golangci-lint call must not be chained with `|| echo`: a lint failure
+# would then be swallowed as "not installed" and the target would still
+# succeed. Absence and failure are decided separately.
 lint: lint-terms lint-boundary check-deps
-	@command -v golangci-lint >/dev/null 2>&1 \
-		&& golangci-lint run \
-		|| echo "golangci-lint not installed, skipping"
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run; \
+	else \
+		echo "lint: golangci-lint not installed, skipping"; \
+	fi
 
 # dev-plan §1.5 terminology boundary: the scoring component is always a
 # "Grader". The word root "evaluator" must not appear in code, fixtures or

@@ -1,0 +1,29 @@
+{
+  "spec_version": "evalexec/v1alpha1",
+  "eval_id": "fixture-f02",
+  "task_id": "order-agent-regression",
+  "status": "completed",
+  "stop_reason": null,
+  "request": {},
+  "artifacts": {"records": "records.jsonl"},
+  "counts": {"total": 4, "completed": 4, "skipped": 0},
+  "evaluation": {
+    "grader_id": "order-status-exact",
+    "grader_version": "v1",
+    "evaluated": 4,
+    "success": 3,
+    "fail": 1,
+    "fail_by_code": {"insufficient_evidence": 1},
+    "score": {"count": 3, "mean": 0.6666666666666666, "min": 0, "max": 1}
+  },
+  "usage": {"judge_model": {"input_tokens": 0, "output_tokens": 0}},
+  "provenance": {
+    "dataset_sha256": "0ccb8fb4c2a787bdee4eb5057166df84d928cc53f6860c144cc393fc528e6d25",
+    "eval_request_sha256": "<eval-request-sha256>",
+    "implementation": {"name": "evalexec", "version": "<version>"}
+  },
+  "started_at": "2026-07-27T01:00:00Z",
+  "finished_at": "2026-07-27T01:00:00Z",
+  "duration_ms": 0,
+  "error": null
+}
