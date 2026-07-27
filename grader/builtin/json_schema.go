@@ -26,7 +26,7 @@ type jsonSchemaGrader struct {
 
 // newJSONSchema builds the Grader. The schema was already compiled once during
 // the pre-check.
-func newJSONSchema(spec evalspec.GraderSpec) (grader.Grader, error) {
+func newJSONSchema(spec evalspec.GraderSpec, _ grader.Deps) (grader.Grader, error) {
 	s, err := declaration.CompileSchema(spec.Parameters)
 	if err != nil {
 		return nil, err

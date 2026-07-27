@@ -364,7 +364,7 @@ func TestCustomGraderRegistration(t *testing.T) {
 	}
 
 	reg := grader.NewRegistry()
-	reg.Register("my_custom_grader", func(evalspec.GraderSpec) (grader.Grader, error) {
+	reg.Register("my_custom_grader", func(evalspec.GraderSpec, grader.Deps) (grader.Grader, error) {
 		return customGrader{}, nil
 	})
 
@@ -412,7 +412,7 @@ func TestGraderPanicBecomesOneFailedSample(t *testing.T) {
 	}
 
 	reg := grader.NewRegistry()
-	reg.Register("panics", func(evalspec.GraderSpec) (grader.Grader, error) { return panicGrader{}, nil })
+	reg.Register("panics", func(evalspec.GraderSpec, grader.Deps) (grader.Grader, error) { return panicGrader{}, nil })
 
 	req := exactMatchRequest(datasetPath, filepath.Join(root, "out"))
 	req.Grader.Entry = "panics"
@@ -450,7 +450,7 @@ func TestGraderTimeoutIsAFailedEvaluation(t *testing.T) {
 	}
 
 	reg := grader.NewRegistry()
-	reg.Register("slow", func(evalspec.GraderSpec) (grader.Grader, error) {
+	reg.Register("slow", func(evalspec.GraderSpec, grader.Deps) (grader.Grader, error) {
 		return slowGrader{delay: 5 * time.Second}, nil
 	})
 
@@ -562,7 +562,7 @@ func TestRunIsAtomicOnSummaryFailure(t *testing.T) {
 	}
 
 	reg := grader.NewRegistry()
-	reg.Register("bad_shape", func(evalspec.GraderSpec) (grader.Grader, error) {
+	reg.Register("bad_shape", func(evalspec.GraderSpec, grader.Deps) (grader.Grader, error) {
 		return badShapeGrader{}, nil
 	})
 

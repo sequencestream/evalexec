@@ -35,7 +35,7 @@ test-e2e:
 # The golangci-lint call must not be chained with `|| echo`: a lint failure
 # would then be swallowed as "not installed" and the target would still
 # succeed. Absence and failure are decided separately.
-lint: lint-terms lint-boundary check-deps
+lint: lint-terms lint-boundary check-deps lint-secrets
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run; \
 	else \
@@ -51,7 +51,7 @@ lint: lint-terms lint-boundary check-deps
 # the design docs and the guard itself have to name the banned word. Every
 # other path — Go sources, fixtures, README — is in scope.
 lint-terms:
-	@hits=$$(git ls-files --cached --others --exclude-standard | grep -vE '^doc/|^Makefile$$' | xargs grep -InE 'evaluator' 2>/dev/null); \
+	@hits=$$(git ls-files --cached --others --exclude-standard | grep -vE '^doc/|^Makefile$$' | while read -r f; do [ -f "$$f" ] && echo "$$f"; done | xargs grep -InE 'evaluator' 2>/dev/null); \
 	if [ -n "$$hits" ]; then \
 		echo "lint-terms: banned word root 'evaluator' found (use 'grader'):"; \
 		echo "$$hits"; \
@@ -72,7 +72,7 @@ lint-terms:
 # line-based, so a `//` inside a string literal truncates the rest of that
 # line; forbidigo is what closes that gap.
 lint-boundary:
-	@files=$$(git ls-files --cached --others --exclude-standard '*.go' | grep -v '^cmd/' | grep -v '_test\.go$$'); \
+	@files=$$(git ls-files --cached --others --exclude-standard '*.go' | grep -v '^cmd/' | grep -v '_test\.go$$' | while read -r f; do [ -f "$$f" ] && echo "$$f"; done); \
 	if [ -z "$$files" ]; then echo "lint-boundary: ok (no files)"; exit 0; fi; \
 	hits=$$(for f in $$files; do \
 		sed 's|//.*||' "$$f" | grep -nE 'os\.Exit|signal\.Notify|os\.Stderr' | sed "s|^|$$f:|"; \
@@ -84,10 +84,14 @@ lint-boundary:
 	fi; \
 	echo "lint-boundary: ok"
 
-# dev-plan §1.5: assert no secret ever reaches a result directory or logs/.
-# Implemented in M4, once there is a Judge and a logs/ directory to scan.
+# dev-plan §1.5: assert no secret ever reaches a result directory.
+#
+# It runs as a Go test rather than a shell script because it has to produce a
+# result directory first — the scan is over real output, not over the sources.
+# The companion test proves the scanner can fail: a detector that has never
+# detected anything is indistinguishable from a broken one.
 lint-secrets:
-	@echo "lint-secrets: not implemented until M4 (needs Judge + logs/)"
+	go test -count=1 -run 'TestNoSecretReachesTheResultDirectory|TestLeakScannerActuallyFires' -v .
 
 check-deps:
 	@deps=$$(go list -m -f '{{if not .Indirect}}{{.Path}}{{end}}' all 2>/dev/null | grep -v '^$(MODULE)$$' | grep -v '^std$$' | grep -v '^$$'); \

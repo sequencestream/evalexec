@@ -17,7 +17,7 @@ func build(t *testing.T, entry string, params map[string]any) grader.Grader {
 	g, err := grader.Default().Build(evalspec.GraderSpec{
 		ID: "g", Version: "v1", Protocol: evalspec.GraderBuiltin,
 		Entry: entry, Parameters: params,
-	})
+	}, grader.Deps{})
 	if err != nil {
 		t.Fatalf("build %s: %v", entry, err)
 	}
@@ -330,7 +330,7 @@ func TestRegexRejectsABadPatternAtBuildTime(t *testing.T) {
 		_, err := grader.Default().Build(evalspec.GraderSpec{
 			ID: "g", Version: "v1", Protocol: evalspec.GraderBuiltin,
 			Entry: "regex", Parameters: params,
-		})
+		}, grader.Deps{})
 		if err == nil {
 			t.Errorf("params %v must be rejected when the Grader is built", params)
 		}
@@ -392,7 +392,7 @@ func TestJSONSchemaRejectsABadSchemaAtBuildTime(t *testing.T) {
 		_, err := grader.Default().Build(evalspec.GraderSpec{
 			ID: "g", Version: "v1", Protocol: evalspec.GraderBuiltin,
 			Entry: "json_schema", Parameters: params,
-		})
+		}, grader.Deps{})
 		if err == nil {
 			t.Errorf("params %v must be rejected when the Grader is built", params)
 		}

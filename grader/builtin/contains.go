@@ -22,7 +22,7 @@ type contains struct {
 	caseSensitive bool
 }
 
-func newContains(spec evalspec.GraderSpec) (grader.Grader, error) {
+func newContains(spec evalspec.GraderSpec, _ grader.Deps) (grader.Grader, error) {
 	path, err := stringParam(spec.Parameters, "reference_path", DefaultContainsPath)
 	if err != nil {
 		return nil, err

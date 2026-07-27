@@ -17,10 +17,10 @@ evalexec \
 
 ## 状态
 
-**开发中。** 按 `doc/dev-plan.md` 的 M0–M7 推进，当前完成到 **M3**。
+**开发中。** 按 `doc/dev-plan.md` 的 M0–M7 推进，当前完成到 **M4**。
 
-`evalexec` 已可完整跑一次基于规则 Grader 的评估，不依赖任何模型服务 ——
-即 dev-plan 的 v0.0.1 节点。LLM Judge 在 M4，并发与中断在 M5。
+规则 Grader 与 LLM Judge 均已可用，已对 DeepSeek 真实端点做过端到端验证。
+并发与中断在 M5。
 
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
@@ -28,7 +28,7 @@ evalexec \
 | M1 | `evalspec` 协议类型 + 跨语言 fixtures | ✅ |
 | M2 | 参数、6 步前置校验、退出码、原子目录 | ✅ |
 | M3 | 串行执行 + 4 个规则 Grader + 根包 `Run` | ✅ |
-| M4 | aimodel Judge 接入 + `llm_judge` | ⏳ |
+| M4 | aimodel Judge 接入 + `llm_judge` | ✅ |
 | M5 | 并发、超时、fail-fast、中断、`skipped` 补写 | ⏳ |
 | M6 | 外部 Grader / Judge 协议互操作 | ⏳ |
 | M7 | 跨语言一致性验证、二进制与库双发布 | ⏳ |
@@ -68,12 +68,44 @@ evalexec \
 | `contains` | `output` 文本须包含**全部**期望子串 | `reference_path`（默认 `$.expected_contains`）、`case_sensitive` |
 | `regex` | `output` 文本匹配正则 | `pattern`（必填）、`case_sensitive` |
 | `json_schema` | `output` 通过 JSON Schema 校验 | `schema`（必填） |
-| `llm_judge` | 交由 LLM Judge 评判 | `rubric`、`min_score`、`max_score`、`use_reference`、`use_trajectory` |
+| `llm_judge` | 交由 LLM Judge 评判 | `rubric`（必填）、`min_score`、`max_score`、`use_reference`、`use_trajectory`、`structured_output` |
 
 **「不匹配」是成功的评估，记 0 分**；只有「评不出来」（没有可比对的期望值、Judge 调用失败）才是
 `fail`，且 `fail` 不带分数、不计入均值。这条区分是整个状态模型的基础。
 
 `pattern` 与 `schema` 在**前置校验期**就编译一次：配置写错应当在跑第一个样本之前失败。
+
+## LLM Judge
+
+```json
+{
+  "protocol": "openai-chat",
+  "endpoint": "https://api.deepseek.com",
+  "auth": {"type": "bearer_env", "env": "JUDGE_API_KEY"},
+  "parameters": {"model": "deepseek-v4-flash", "temperature": 0},
+  "timeout_ms": 60000
+}
+```
+
+`protocol` 支持 `openai-chat` 与 `anthropic-messages`（`http-json` / `stdio-jsonl` 在 M6）。
+`parameters` 接受 10 个键：`model`（必填）、`temperature`、`max_completion_tokens`、
+`max_tokens`、`top_p`、`top_k`、`stop`、`reasoning_effort`、`parallel_tool_calls`、
+`response_format`。**未知键报参数错误**，不静默丢弃 —— 一个拼错的 `temperatur` 被悄悄忽略，
+会产出一份看起来正常、实际用错设置评出来的结果。
+
+密钥只能由 `auth.env` 引用环境变量名。命令行传密钥的参数（`--api-key` 等）会被明确拒绝并
+提示改用 `auth.env`；配置文件里若出现疑似密钥，运行会被**拒绝**而不是脱敏 —— 悄悄抹掉会让
+你以为密钥被安全处理了，而它仍然写在磁盘上的那个文件里。
+
+### 三点需要知道的限制
+
+- **`--seed` 不透传给 Judge。** aimodel v0.5.0 的 canonical 请求没有 `seed` 字段。
+  seed 只记入 `provenance`，`llm_judge` 靠 `temperature=0` 求稳。**不承诺评分逐字复现。**
+- **`structured_output` 默认关闭。** 结构化输出在 OpenAI 兼容端点之间不可移植 ——
+  DeepSeek 对 `json_schema` 请求直接返回 400。而 EvalExec 不重试，被拒的请求就是丢掉整个
+  样本。prompt 里约定 JSON + 容错解析在所有 provider 上都有效，所以它是默认路径；确认端点
+  支持时再开 `structured_output: true`。
+- **不重试。** 429 与 5xx 都计为 `judge_error`。需要重试请由上层重跑整个评估。
 
 ## 注册自定义 Grader
 

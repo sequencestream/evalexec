@@ -22,7 +22,7 @@ type regexGrader struct {
 // newRegex builds the Grader. The pattern was already compiled once during
 // the pre-check, so a failure here would mean the configuration changed
 // underneath us.
-func newRegex(spec evalspec.GraderSpec) (grader.Grader, error) {
+func newRegex(spec evalspec.GraderSpec, _ grader.Deps) (grader.Grader, error) {
 	re, source, err := declaration.CompilePattern(spec.Parameters)
 	if err != nil {
 		return nil, err

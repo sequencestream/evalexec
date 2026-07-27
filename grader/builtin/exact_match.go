@@ -22,7 +22,7 @@ type exactMatch struct {
 	referencePath string
 }
 
-func newExactMatch(spec evalspec.GraderSpec) (grader.Grader, error) {
+func newExactMatch(spec evalspec.GraderSpec, _ grader.Deps) (grader.Grader, error) {
 	path, err := stringParam(spec.Parameters, "reference_path", DefaultReferencePath)
 	if err != nil {
 		return nil, err

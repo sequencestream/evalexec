@@ -262,7 +262,7 @@ aimodel 只对流式提供 `InterceptStream`，非流式没有拦截点。因此
 | 缺口 | 影响 | 处理 |
 |---|---|---|
 | `ais.ChatRequest` **没有 `seed` 字段**（v0.5.0 核对确认：canonical 层收窄时移除） | 设计稿的 `--seed` 无法透传给 Judge | 定稿为：`seed` 不透传给 Judge，只作为 EvalExec 自身的确定性参数记录进 `provenance`；`llm_judge` 用 `temperature=0` 求稳。若后续必须支持，走 `ais.Extensions` 通道或向 aimodel 提 issue |
-| `ResponseFormat` 是 `any`，跨 provider 语义不统一 | OpenAI 用 `json_schema`，Anthropic 需走 tool 或 output config | `llm_judge` 按 provider 分支设置；同时保留"prompt 要求 JSON + 容错解析"的兜底路径，两者都失败才判 `protocol_error` |
+| `ResponseFormat` 是 `any`，跨 provider 语义不统一 | OpenAI 用 `json_schema`，Anthropic 需走 tool 或 output config，**而 DeepSeek 直接返回 400 `This response_format type is unavailable now`**（M4 实测） | 定稿为**默认不发送**，由 `llm_judge` 的 `structured_output: bool` 参数显式开启。原方案"优先 ResponseFormat、失败回退"在 EvalExec 里行不通：回退需要重试，而"不重试"是明确边界，一次被拒的请求就是丢掉整个样本。prompt 里约定 JSON + 容错解析在所有 provider 上都有效，因此它是默认路径 |
 | 无重试 / 无限流 | 高并发打到限流会大量 `judge_error` | 明确为非目标，写进 README；`--concurrency` 默认 1 |
 | 仓库较新，canonical 层可能演进 | 升级可能破坏编译 | go.mod 钉死精确版本；`judge` 包是唯一 import aimodel 的地方，把爆炸半径限制在一个包内 |
 | `NewClient` 拒绝空 API key | 本地无鉴权 Judge 无法直连 | 约定 `auth.type = "none"` 时内部填占位 key |

@@ -19,12 +19,14 @@ package grader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader/declaration"
+	"github.com/sequencestream/evalexec/judge"
 )
 
 // Declaration is re-exported so implementers need not import a second package
@@ -55,8 +57,28 @@ type Grader interface {
 	Grade(ctx context.Context, call evalspec.GradeCall) (evalspec.Evaluation, error)
 }
 
+// Deps carries what a Grader needs beyond its own configuration.
+//
+// It is a struct rather than extra parameters so that a future need can be
+// added without changing every factory ever written — the same reasoning that
+// keeps the Grader interface at two methods.
+type Deps struct {
+	// Judge is non-nil exactly when the Grader's declaration says it needs
+	// one. A Grader that declared requires_judge can rely on it: the
+	// pre-check refuses to start a run that would leave it nil.
+	Judge judge.Judge
+}
+
 // Factory builds a Grader from its configuration.
-type Factory func(spec evalspec.GraderSpec) (Grader, error)
+type Factory func(spec evalspec.GraderSpec, deps Deps) (Grader, error)
+
+// ErrUnknownEntry reports an entry name no Grader is registered for.
+//
+// It exists as a sentinel so a caller can tell "no Grader by that name" apart
+// from "that Grader exists and refused to be configured". The two want
+// different diagnostics: the first may fall back to the built-in table, the
+// second is a configuration error to report as-is.
+var ErrUnknownEntry = errors.New("grader: no grader is registered for this entry")
 
 // Registry maps entry names to factories.
 //
@@ -134,16 +156,32 @@ func (r *Registry) Entries() []string {
 func Register(entry string, f Factory) { defaultRegistry.Register(entry, f) }
 
 // Build constructs the Grader named by a specification.
-func (r *Registry) Build(spec evalspec.GraderSpec) (Grader, error) {
+func (r *Registry) Build(spec evalspec.GraderSpec, deps Deps) (Grader, error) {
 	f, ok := r.Lookup(spec.Entry)
 	if !ok {
-		return nil, fmt.Errorf("grader: no grader registered for entry %q (registered: %v)", spec.Entry, r.Entries())
+		return nil, fmt.Errorf("%w: %q (registered: %v)", ErrUnknownEntry, spec.Entry, r.Entries())
 	}
 
-	g, err := f(spec)
+	g, err := f(spec, deps)
 	if err != nil {
 		return nil, fmt.Errorf("grader: cannot build %q: %w", spec.Entry, err)
 	}
 
 	return g, nil
+}
+
+// Resolve reports what the Grader named by spec declares about itself, by
+// building it and asking.
+//
+// Building during the pre-check is deliberate: a Grader whose parameters make
+// it unconstructible — an uncompilable pattern, a malformed schema — should
+// fail before the run starts rather than on the first sample and then on every
+// one after it.
+func (r *Registry) Resolve(spec evalspec.GraderSpec, deps Deps) (declaration.Declaration, error) {
+	g, err := r.Build(spec, deps)
+	if err != nil {
+		return declaration.Declaration{}, err
+	}
+
+	return g.Declare(), nil
 }

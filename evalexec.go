@@ -35,6 +35,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -43,6 +45,8 @@ import (
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
 	_ "github.com/sequencestream/evalexec/grader/builtin" // register the built-in Graders
+	"github.com/sequencestream/evalexec/grader/declaration"
+	"github.com/sequencestream/evalexec/judge"
 	"github.com/sequencestream/evalexec/redact"
 	"github.com/sequencestream/evalexec/result"
 	"github.com/sequencestream/evalexec/runner"
@@ -106,11 +110,61 @@ func WithDiagnosticWriter(w io.Writer) Option {
 	}
 }
 
-// WithJudgeChecker extends the Judge pre-check with a transport-level check,
-// typically by constructing the client so an unusable endpoint fails before
-// the first call rather than on it.
+// WithJudgeChecker replaces the transport-level Judge pre-check. The default
+// constructs the real client, so an unusable endpoint fails before the first
+// call rather than on it.
 func WithJudgeChecker(j validate.JudgeChecker) Option {
 	return func(c *config) { c.judge = j }
+}
+
+// judgeChecker returns the pre-check to use for this request.
+func (c *config) judgeChecker(req *evalspec.EvalRequest) validate.JudgeChecker {
+	if c.judge != nil {
+		return c.judge
+	}
+
+	return judge.Checker{Concurrency: concurrencyOf(req)}
+}
+
+// buildJudge constructs the Judge when the configuration calls for one. By the
+// time it is called the pre-check has already confirmed the configuration is
+// usable, so a failure here would mean the environment changed mid-run.
+func buildJudge(req *evalspec.EvalRequest) (judge.Judge, error) {
+	if req.JudgeModel == nil {
+		return nil, nil
+	}
+
+	return judge.New(req.JudgeModel, concurrencyOf(req))
+}
+
+func concurrencyOf(req *evalspec.EvalRequest) int {
+	if req.Execution == nil || req.Execution.Concurrency < 1 {
+		return 1
+	}
+
+	return req.Execution.Concurrency
+}
+
+// graderResolver adapts the registry to the pre-check contract.
+//
+// It lives here rather than in the grader package so that grader does not have
+// to import validate — the validator sits above the registry, and having the
+// lower package reach up would invert the layering.
+type graderResolver struct {
+	registry *grader.Registry
+}
+
+func (r *graderResolver) Resolve(spec evalspec.GraderSpec) (declaration.Declaration, error) {
+	decl, err := r.registry.Resolve(spec, grader.Deps{})
+	if err != nil {
+		if errors.Is(err, grader.ErrUnknownEntry) {
+			return declaration.Declaration{}, fmt.Errorf("%w: %q", validate.ErrUnknownEntry, spec.Entry)
+		}
+
+		return declaration.Declaration{}, err
+	}
+
+	return decl, nil
 }
 
 // Run performs one evaluation.
@@ -127,8 +181,11 @@ func Run(ctx context.Context, req *evalspec.EvalRequest, opts ...Option) (*evals
 	}
 
 	report, err := validate.All(req, validate.Options{
-		Grader: cfg.registry,
-		Judge:  cfg.judge,
+		// Declarations are resolved without a Judge. Step 3 asks a Grader what
+		// it needs; whether the Judge it needs is usable is step 4's question,
+		// and answering it early would report the failure in the wrong step.
+		Grader: &graderResolver{registry: cfg.registry},
+		Judge:  cfg.judgeChecker(req),
 		Diag:   cfg.diag,
 	})
 	if err != nil {
@@ -143,7 +200,12 @@ func Run(ctx context.Context, req *evalspec.EvalRequest, opts ...Option) (*evals
 	// The Grader is built before the output directory exists, so a bad entry
 	// name or an unusable parameter is still a pre-check failure that leaves
 	// nothing behind.
-	g, err := cfg.registry.Build(req.Grader)
+	j, err := buildJudge(req)
+	if err != nil {
+		return nil, evalerr.Wrap(evalerr.KindPrecheck, validate.StepJudgeModel, err, "")
+	}
+
+	g, err := cfg.registry.Build(req.Grader, grader.Deps{Judge: j})
 	if err != nil {
 		return nil, evalerr.Wrap(evalerr.KindPrecheck, validate.StepGraderDeclaration, err, "")
 	}

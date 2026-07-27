@@ -67,6 +67,11 @@ type GraderResolver interface {
 	Resolve(spec evalspec.GraderSpec) (declaration.Declaration, error)
 }
 
+// ErrUnknownEntry is what a resolver returns to mean "not mine", as opposed to
+// "mine and misconfigured". The two need different handling: the first falls
+// back to the built-in table, the second is reported as-is.
+var ErrUnknownEntry = errors.New("no grader is registered for this entry")
+
 // Options configures a validation pass.
 type Options struct {
 	// Grader resolves the declaration of the configured Grader. When nil,
@@ -239,10 +244,6 @@ func resolveDeclaration(g *evalspec.GraderSpec, resolver GraderResolver) (declar
 
 	return decl, nil
 }
-
-// ErrUnknownEntry reports an entry name no Grader is registered for. A
-// resolver returns it to mean "not mine", as opposed to "mine and broken".
-var ErrUnknownEntry = errors.New("no grader is registered for this entry")
 
 // checkJudgeModel verifies the Judge configuration when one is needed.
 func checkJudgeModel(req *evalspec.EvalRequest, checker JudgeChecker) error {

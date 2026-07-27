@@ -3,7 +3,8 @@
   "task_id": "t",
   "dataset": {"path": "dataset.jsonl"},
   "grader": {"id": "g", "version": "v1", "protocol": "builtin", "entry": "llm_judge",
-             "requires": ["input", "output"], "requires_judge": true},
+             "requires": ["input", "output"], "requires_judge": true,
+             "parameters": {"rubric": "judge whether the answer is correct"}},
   "judge_model": {
     "protocol": "openai-chat",
     "endpoint": "https://judge.example.invalid/v1",

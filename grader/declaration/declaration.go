@@ -93,7 +93,10 @@ var builtins = map[string]Declaration{
 		Entry:         EntryLLMJudge,
 		Requires:      []evalspec.SessionField{evalspec.FieldInput, evalspec.FieldOutput},
 		RequiresJudge: true,
-		Params:        []string{"rubric", "min_score", "max_score", "use_reference", "use_trajectory"},
+		Params: []string{
+			"rubric", "min_score", "max_score", "use_reference", "use_trajectory",
+			"structured_output",
+		},
 		// The specification says llm_judge "may add reference or trajectory
 		// according to its parameters" without saying how. These two booleans
 		// are that rule made explicit: anything less would leave the pre-check
