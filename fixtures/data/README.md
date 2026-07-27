@@ -21,8 +21,12 @@ for byte. Go callers can use `evalspec/evalspectest`.
 
 `dataset_sha256` is **not** normalized: it is taken over the raw file bytes, so
 every implementation must arrive at the same value or traceability is broken.
-`eval_request_sha256` is normalized for now, until the canonical request
-serialization is pinned; see `doc/design/M1-protocol.md`.
+
+`eval_request_sha256` **is** normalized, permanently. It covers the normalized
+request, and normalization makes the dataset and output paths absolute — so the
+same evaluation run from two different directories yields the same result and
+two different request digests. No shared fixture can pin one. The digest is
+still reproducible for a given request, which is what traceability requires.
 
 ## No case contains a credential
 

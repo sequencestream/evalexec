@@ -17,15 +17,17 @@ evalexec \
 
 ## 状态
 
-**开发中。** 按 `doc/dev-plan.md` 的 M0–M7 推进，当前完成到 **M0（工程基线）**。
-`evalexec` 目前只响应 `--version`；评估管线从 M2 起逐步可用。
+**开发中。** 按 `doc/dev-plan.md` 的 M0–M7 推进，当前完成到 **M3**。
+
+`evalexec` 已可完整跑一次基于规则 Grader 的评估，不依赖任何模型服务 ——
+即 dev-plan 的 v0.0.1 节点。LLM Judge 在 M4，并发与中断在 M5。
 
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
 | M0 | 工程基线、CI、守卫、aimodel 打通 | ✅ |
-| M1 | `evalspec` 协议类型 + 跨语言 fixtures | ⏳ |
-| M2 | 参数、6 步前置校验、退出码、原子目录 | ⏳ |
-| M3 | 串行执行 + 4 个规则 Grader + 根包 `Run` | ⏳ |
+| M1 | `evalspec` 协议类型 + 跨语言 fixtures | ✅ |
+| M2 | 参数、6 步前置校验、退出码、原子目录 | ✅ |
+| M3 | 串行执行 + 4 个规则 Grader + 根包 `Run` | ✅ |
 | M4 | aimodel Judge 接入 + `llm_judge` | ⏳ |
 | M5 | 并发、超时、fail-fast、中断、`skipped` 补写 | ⏳ |
 | M6 | 外部 Grader / Judge 协议互操作 | ⏳ |
@@ -57,6 +59,37 @@ evalexec \
 - 不解释分数：`score` / `label` 原样来自 Grader，`min_score` / `max_score` 只透传，是否达标由外部判断。
 - 输出目录已存在且非空则拒绝运行，**不提供 `--force`**。
 - **不重试、不限流**：429 / 5xx 计为 `judge_error`；需要重试请由上层重跑整个评估。
+
+## 内置 Grader
+
+| `entry` | 比较方式 | 参数 |
+|---|---|---|
+| `exact_match` | `output` 与 `reference` 的期望值做 JSON 语义相等 | `reference_path`（默认 `$.expected_output`） |
+| `contains` | `output` 文本须包含**全部**期望子串 | `reference_path`（默认 `$.expected_contains`）、`case_sensitive` |
+| `regex` | `output` 文本匹配正则 | `pattern`（必填）、`case_sensitive` |
+| `json_schema` | `output` 通过 JSON Schema 校验 | `schema`（必填） |
+| `llm_judge` | 交由 LLM Judge 评判 | `rubric`、`min_score`、`max_score`、`use_reference`、`use_trajectory` |
+
+**「不匹配」是成功的评估，记 0 分**；只有「评不出来」（没有可比对的期望值、Judge 调用失败）才是
+`fail`，且 `fail` 不带分数、不计入均值。这条区分是整个状态模型的基础。
+
+`pattern` 与 `schema` 在**前置校验期**就编译一次：配置写错应当在跑第一个样本之前失败。
+
+## 注册自定义 Grader
+
+下游程序可以注册自己的 Grader，用 `protocol: "builtin"` + 自定义 `entry` 直接跑，
+不必走子进程：
+
+```go
+grader.Register("my_grader", func(spec evalspec.GraderSpec) (grader.Grader, error) {
+    return &myGrader{}, nil
+})
+
+result, err := evalexec.Run(ctx, request)
+```
+
+这不扩大 `evalexec` 二进制的能力面 —— 它只注册内置的五个 entry；自定义 entry 只在
+下游自己构建的二进制里可见。
 
 ## 开发
 

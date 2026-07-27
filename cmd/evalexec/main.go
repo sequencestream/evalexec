@@ -9,16 +9,17 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"slices"
 
+	evalexec "github.com/sequencestream/evalexec"
 	"github.com/sequencestream/evalexec/cli"
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/exitcode"
-	"github.com/sequencestream/evalexec/validate"
 	"github.com/sequencestream/evalexec/version"
 )
 
@@ -42,14 +43,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return report(stderr, err)
 	}
 
-	if _, err := validate.All(req, validate.Options{Diag: stderr}); err != nil {
+	// Everything below the command line is one atomic call. The binary holds
+	// no evaluation logic of its own, which is what keeps the library and the
+	// command from drifting apart.
+	res, err := evalexec.Run(context.Background(), req, evalexec.WithDiagnosticWriter(stderr))
+	if err != nil {
 		return report(stderr, err)
 	}
 
-	// M3 replaces this with a call to evalexec.Run.
-	_, _ = fmt.Fprintln(stderr, "evalexec: pre-checks passed; evaluation lands in M3")
-
-	return exitcode.OK
+	return exitcode.FromResult(res)
 }
 
 // report writes a diagnostic and returns the exit code for err.

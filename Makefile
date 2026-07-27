@@ -13,8 +13,8 @@ LDFLAGS := -s -w \
 	-X '$(MODULE)/version.Date=$(DATE)'
 
 # Direct non-stdlib dependencies allowed in go.mod. dev-plan §1.5 caps this at
-# aimodel plus one JSON Schema library (added in M3).
-ALLOWED_DEPS := github.com/vogo/aimodel
+# aimodel plus one JSON Schema library, and that budget is now spent.
+ALLOWED_DEPS := github.com/vogo/aimodel github.com/santhosh-tekuri/jsonschema/v6
 
 .PHONY: all build test test-e2e lint lint-terms lint-boundary lint-secrets check-deps apidiff fmt tidy clean
 

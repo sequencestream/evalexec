@@ -51,6 +51,14 @@ type Declaration struct {
 	// Optional lists parameters that may extend Requires, described by which
 	// field each one adds when true.
 	Optional map[string]evalspec.SessionField
+	// ValidateParams checks parameter *values*, not just their names.
+	//
+	// It runs during the pre-check phase so that a regular expression which
+	// does not compile, or a JSON Schema which is not a schema, fails before
+	// the first sample rather than on every one of them. Failing on sample one
+	// and failing on sample one thousand are the same failure; saying so up
+	// front is strictly better.
+	ValidateParams func(params map[string]any) error
 }
 
 // builtins is the fixed table from the specification.
@@ -68,16 +76,18 @@ var builtins = map[string]Declaration{
 		Params:        []string{"reference_path", "case_sensitive"},
 	},
 	EntryRegex: {
-		Entry:         EntryRegex,
-		Requires:      []evalspec.SessionField{evalspec.FieldInput, evalspec.FieldOutput},
-		RequiresJudge: false,
-		Params:        []string{"pattern", "case_sensitive"},
+		Entry:          EntryRegex,
+		Requires:       []evalspec.SessionField{evalspec.FieldInput, evalspec.FieldOutput},
+		RequiresJudge:  false,
+		Params:         []string{"pattern", "case_sensitive"},
+		ValidateParams: validateRegexParams,
 	},
 	EntryJSONSchema: {
-		Entry:         EntryJSONSchema,
-		Requires:      []evalspec.SessionField{evalspec.FieldInput, evalspec.FieldOutput},
-		RequiresJudge: false,
-		Params:        []string{"schema"},
+		Entry:          EntryJSONSchema,
+		Requires:       []evalspec.SessionField{evalspec.FieldInput, evalspec.FieldOutput},
+		RequiresJudge:  false,
+		Params:         []string{"schema"},
+		ValidateParams: validateSchemaParams,
 	},
 	EntryLLMJudge: {
 		Entry:         EntryLLMJudge,
@@ -115,6 +125,12 @@ func Entries() []string {
 func (d Declaration) EffectiveRequires(params map[string]any) ([]evalspec.SessionField, error) {
 	if err := d.checkParams(params); err != nil {
 		return nil, err
+	}
+
+	if d.ValidateParams != nil {
+		if err := d.ValidateParams(params); err != nil {
+			return nil, err
+		}
 	}
 
 	requires := slices.Clone(d.Requires)

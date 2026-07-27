@@ -54,8 +54,25 @@ type JudgeChecker interface {
 	Check(spec *evalspec.JudgeModelSpec) error
 }
 
+// GraderResolver resolves a Grader specification to the declaration its
+// implementation actually makes.
+//
+// It exists because "builtin" does not mean "one of the five that ship here".
+// A downstream program can register its own Grader and run it under that
+// protocol with its own entry name — that is the point of the registry — so
+// the pre-check has to ask what is registered rather than consult a fixed
+// table. Without this, the extension point would be validated out of
+// existence.
+type GraderResolver interface {
+	Resolve(spec evalspec.GraderSpec) (declaration.Declaration, error)
+}
+
 // Options configures a validation pass.
 type Options struct {
+	// Grader resolves the declaration of the configured Grader. When nil,
+	// only the built-in table is consulted, which is enough for the
+	// specification's own Graders.
+	Grader GraderResolver
 	// Judge, when set, extends step 4 with a transport-level check.
 	Judge JudgeChecker
 	// Index records case_ids; nil means a fresh in-memory index.
@@ -100,7 +117,7 @@ func All(req *evalspec.EvalRequest, opts Options) (*Report, error) {
 	// Step 3: the Grader declares itself completely and consistently.
 	report := &Report{}
 
-	decl, requires, err := checkGraderDeclaration(&req.Grader)
+	decl, requires, err := checkGraderDeclaration(&req.Grader, opts.Grader)
 	if err != nil {
 		return nil, err
 	}
@@ -157,16 +174,17 @@ func checkOutputDir(dir string) error {
 // declaration comes from the configuration and is taken at its word; querying
 // the external process for it would make the pre-check depend on the very
 // thing it is meant to validate before contacting.
-func checkGraderDeclaration(g *evalspec.GraderSpec) (*declaration.Declaration, []evalspec.SessionField, error) {
+func checkGraderDeclaration(
+	g *evalspec.GraderSpec,
+	resolver GraderResolver,
+) (*declaration.Declaration, []evalspec.SessionField, error) {
 	if g.Protocol != evalspec.GraderBuiltin {
 		return nil, g.Requires, nil
 	}
 
-	decl, ok := declaration.Lookup(g.Entry)
-	if !ok {
-		return nil, nil, evalerr.Precheck(StepGraderDeclaration,
-			"unknown builtin grader entry %q; known entries are %s",
-			g.Entry, strings.Join(declaration.Entries(), ", "))
+	decl, err := resolveDeclaration(g, resolver)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	// The effective requirements may depend on parameters — llm_judge picks up
@@ -192,6 +210,39 @@ func checkGraderDeclaration(g *evalspec.GraderSpec) (*declaration.Declaration, [
 
 	return &decl, requires, nil
 }
+
+// resolveDeclaration finds what the configured Grader declares, preferring the
+// registry over the built-in table so custom entries are validated on their
+// own terms.
+func resolveDeclaration(g *evalspec.GraderSpec, resolver GraderResolver) (declaration.Declaration, error) {
+	if resolver != nil {
+		decl, err := resolver.Resolve(*g)
+		if err == nil {
+			return decl, nil
+		}
+
+		// Fall through to the built-in table only when the entry is simply
+		// unregistered; a Grader that is registered but refused to build is a
+		// real configuration error and must be reported as one.
+		if !errors.Is(err, ErrUnknownEntry) {
+			return declaration.Declaration{}, evalerr.Wrap(evalerr.KindPrecheck, StepGraderDeclaration, err,
+				"grader %q cannot be configured", g.Entry)
+		}
+	}
+
+	decl, ok := declaration.Lookup(g.Entry)
+	if !ok {
+		return declaration.Declaration{}, evalerr.Precheck(StepGraderDeclaration,
+			"unknown builtin grader entry %q; known entries are %s",
+			g.Entry, strings.Join(declaration.Entries(), ", "))
+	}
+
+	return decl, nil
+}
+
+// ErrUnknownEntry reports an entry name no Grader is registered for. A
+// resolver returns it to mean "not mine", as opposed to "mine and broken".
+var ErrUnknownEntry = errors.New("no grader is registered for this entry")
 
 // checkJudgeModel verifies the Judge configuration when one is needed.
 func checkJudgeModel(req *evalspec.EvalRequest, checker JudgeChecker) error {

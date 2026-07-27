@@ -83,17 +83,19 @@ func TestNormalizeKeepsDatasetChecksum(t *testing.T) {
 	}
 }
 
-// TestNormalizeErasesRequestChecksumForNow records a temporary exemption:
-// eval_request_sha256 is taken over the canonicalized request, and that
-// canonicalization is not pinned until M3. Asserting a value now would only
-// assert the implementation against itself. When this test starts failing
-// because the placeholder was removed, that is the intended signal.
-func TestNormalizeErasesRequestChecksumForNow(t *testing.T) {
+// TestNormalizeErasesRequestChecksum records a permanent exemption, for a
+// reason specific to what that digest covers: the normalized request carries
+// absolute paths, so the same evaluation run from two different directories
+// yields two different request digests. A shared fixture cannot pin one.
+//
+// The digest is still reproducible for a given request — see the redact
+// package's tests — which is what traceability actually requires.
+func TestNormalizeErasesRequestChecksum(t *testing.T) {
 	a := `{"provenance":{"eval_request_sha256":"aaa"}}`
 	b := `{"provenance":{"eval_request_sha256":"bbb"}}`
 
 	if diffs := evalspectest.Diff(mustNormalize(t, a), mustNormalize(t, b)); len(diffs) != 0 {
-		t.Errorf("eval_request_sha256 is normalized until M3 pins canonicalization, got:\n%s", strings.Join(diffs, "\n"))
+		t.Errorf("eval_request_sha256 must be normalized away: it depends on absolute paths, got:\n%s", strings.Join(diffs, "\n"))
 	}
 }
 

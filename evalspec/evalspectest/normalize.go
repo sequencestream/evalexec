@@ -14,12 +14,15 @@ const (
 	PlaceholderEvalID = "<eval-id>"
 	// PlaceholderEvalRequestSHA256 stands in for eval_request_sha256.
 	//
-	// Unlike dataset_sha256, which is taken over the raw dataset bytes and so
-	// is fixed by the specification, this hash is taken over the redacted and
-	// canonicalized request. Until that canonicalization is pinned, its value
-	// is an implementation detail and a golden file asserting one would only
-	// be asserting the implementation against itself. Once M3 fixes the
-	// serializer, this placeholder goes away and the real hash is compared.
+	// Unlike dataset_sha256, which is taken over the raw dataset bytes and is
+	// therefore the same everywhere, this hash covers the normalized request —
+	// and normalization makes the dataset and output paths absolute. Two
+	// machines running the same evaluation from different directories produce
+	// the same result and two different request digests, by design.
+	//
+	// So no shared fixture can pin a value here. That is not a gap: the digest
+	// is still reproducible for a given request, which is what traceability
+	// needs, and the redact package's own tests assert exactly that.
 	PlaceholderEvalRequestSHA256 = "<eval-request-sha256>"
 	PlaceholderTimestamp         = "<ts>"
 	PlaceholderVersion           = "<version>"
