@@ -46,6 +46,7 @@ import (
 	"github.com/sequencestream/evalexec/grader"
 	_ "github.com/sequencestream/evalexec/grader/builtin" // register the built-in Graders
 	"github.com/sequencestream/evalexec/grader/declaration"
+	"github.com/sequencestream/evalexec/grader/external"
 	"github.com/sequencestream/evalexec/judge"
 	"github.com/sequencestream/evalexec/judge/transport"
 	"github.com/sequencestream/evalexec/redact"
@@ -164,6 +165,13 @@ type graderResolver struct {
 }
 
 func (r *graderResolver) Resolve(spec evalspec.GraderSpec) (declaration.Declaration, error) {
+	// An external Grader's declaration comes from its configuration; there is
+	// nothing to ask, and asking would mean contacting the process the
+	// pre-check exists to validate before contacting.
+	if spec.Protocol != evalspec.GraderBuiltin {
+		return declaration.Declaration{}, validate.ErrUnknownEntry
+	}
+
 	decl, err := r.registry.Resolve(spec, grader.Deps{})
 	if err != nil {
 		if errors.Is(err, grader.ErrUnknownEntry) {
@@ -214,9 +222,20 @@ func Run(ctx context.Context, req *evalspec.EvalRequest, opts ...Option) (*evals
 		return nil, evalerr.Wrap(evalerr.KindPrecheck, validate.StepJudgeModel, err, "")
 	}
 
-	g, err := cfg.registry.Build(req.Grader, grader.Deps{Judge: j})
+	if closer, ok := j.(io.Closer); ok {
+		// A stdio Judge holds subprocesses; they go away when the run does.
+		defer func() { _ = closer.Close() }()
+	}
+
+	g, err := buildGrader(cfg, req, j)
 	if err != nil {
 		return nil, evalerr.Wrap(evalerr.KindPrecheck, validate.StepGraderDeclaration, err, "")
+	}
+
+	if closer, ok := g.(io.Closer); ok {
+		// An external Grader holds subprocesses; they are shut down when the
+		// run ends, however it ends.
+		defer func() { _ = closer.Close() }()
 	}
 
 	datasetSum, err := fileSHA256(req.Dataset.Path)
@@ -351,6 +370,23 @@ func execute(
 	}
 
 	return res, nil
+}
+
+// buildGrader constructs the Grader for a request.
+//
+// The built-in registry covers protocol "builtin", which is also how a
+// downstream program registers its own. The external protocols are built
+// directly: they are transports rather than named implementations, so there is
+// nothing for a registry to key on.
+func buildGrader(cfg *config, req *evalspec.EvalRequest, j judge.Judge) (grader.Grader, error) {
+	switch req.Grader.Protocol {
+	case evalspec.GraderHTTPJSON:
+		return external.NewHTTPJSON(req.Grader, concurrencyOf(req))
+	case evalspec.GraderStdioJSONL:
+		return external.NewStdioJSONL(req.Grader, concurrencyOf(req))
+	default:
+		return cfg.registry.Build(req.Grader, grader.Deps{Judge: j})
+	}
 }
 
 // artifactsOf names the files a run produced. The logs directory is listed

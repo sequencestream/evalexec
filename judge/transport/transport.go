@@ -136,6 +136,11 @@ type recordingTransport struct {
 	recorder *Recorder
 }
 
+// Unwrap exposes the wrapped transport, so a caller can find one that owns
+// resources — the subprocess pool of a stdio Judge, for instance — without this
+// package knowing what those resources are.
+func (t *recordingTransport) Unwrap() http.RoundTripper { return t.next }
+
 func (t *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	ex := Exchange{
 		CaseID:  CaseIDFrom(req.Context()),

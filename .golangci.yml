@@ -56,10 +56,16 @@ linters:
           - errcheck
           - goconst
           - noctx
-      # The binary is where exiting, signal handling and stderr belong.
+      # Standalone programs are where exiting, signal handling and stderr
+      # belong: cmd/ is the binary, and contract/ holds reference external
+      # components, which are separate processes by definition.
       - path: ^cmd/
         linters:
           - forbidigo
+      - path: ^contract/
+        linters:
+          - forbidigo
+          - goconst
       # Tests drive a real subprocess to exercise interrupt handling.
       - path: _test\.go
         linters:

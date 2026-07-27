@@ -17,10 +17,11 @@ evalexec \
 
 ## 状态
 
-**开发中。** 按 `doc/dev-plan.md` 的 M0–M7 推进，当前完成到 **M5** ——
-即 dev-plan 的 **v0.1.0 MVP** 节点，`04-mvp-scope.md` 的全部「MVP 必做」已完成。
+**开发中。** 按 `doc/dev-plan.md` 的 M0–M7 推进，当前完成到 **M6**。
 
-已对 DeepSeek 真实端点做过端到端验证。外部 Grader / Judge 协议在 M6。
+功能面已完整：规则 Grader、LLM Judge、并发与中断、外部 Grader / Judge 协议。
+已对 DeepSeek 真实端点做过端到端验证，也验证过同一组 fixture 在 Go 与 Python
+外部实现下判决一致。M7 做跨语言协议校验脚本与双形态发布。
 
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
@@ -30,7 +31,7 @@ evalexec \
 | M3 | 串行执行 + 4 个规则 Grader + 根包 `Run` | ✅ |
 | M4 | aimodel Judge 接入 + `llm_judge` | ✅ |
 | M5 | 并发、超时、fail-fast、中断、`skipped` 补写 | ✅ |
-| M6 | 外部 Grader / Judge 协议互操作 | ⏳ |
+| M6 | 外部 Grader / Judge 协议互操作 | ✅ |
 | M7 | 跨语言一致性验证、二进制与库双发布 | ⏳ |
 
 ## 两个交付物
@@ -141,6 +142,26 @@ fail-fast 停止、用户中断都一样。这是"部分结果仍然可信"与"�
   支持时再开 `structured_output: true`。
 - **不重试。** 429 与 5xx 都计为 `judge_error`。需要重试请由上层重跑整个评估。
 
+## 外部 Grader 与 Judge
+
+Grader 与 Judge 都可以是别的语言写的进程或服务：
+
+| `protocol` | Grader | Judge |
+|---|---|---|
+| `builtin` | 内置或下游注册 | — |
+| `openai-chat` | — | Chat Completions 兼容端点 |
+| `anthropic-messages` | — | Anthropic Messages API |
+| `http-json` | POST 规范化 call，收 `Evaluation` | POST 简化请求，收单条回复 |
+| `stdio-jsonl` | 子进程一问一答，每行一个 JSON | 同左 |
+
+协议规格与 5 个参考实现（Go × 4 + **Python** × 1）在 [`contract/`](./contract/)。
+Python 版不是示范代码，而是「协议不绑定语言」这条边界的**证据** —— 它与内置 Grader
+跑同一组 fixture 并产出一致判决，由 CI 保证。
+
+`stdio-jsonl` 每个 worker 一个子进程（**子进程数 = `--concurrency`**）：协议是一问一答，
+共享进程会让对话交错。超时或崩溃后 kill **进程组**而非进程 —— 脚本自己 fork 的子进程
+否则会留下孤儿，而一个还握着管道的孤儿与"尚未应答的进程"无法区分。
+
 ## 注册自定义 Grader
 
 下游程序可以注册自己的 Grader，用 `protocol: "builtin"` + 自定义 `entry` 直接跑，
@@ -182,6 +203,7 @@ make test-e2e   # 真实模型端到端；需 OPENAI_BASE_URL / OPENAI_API_KEY /
 |---|---|
 | [doc/dev-plan.md](./doc/dev-plan.md) | 分阶段开发规划、技术选型、验收标准映射 |
 | [doc/design/](./doc/design/) | 各里程碑的阶段设计与验证报告 |
+| [contract/README.md](./contract/README.md) | **外部 Grader / Judge 的协议契约**，含 5 个参考实现 |
 
 ## License
 

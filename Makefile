@@ -59,10 +59,14 @@ lint-terms:
 	fi; \
 	echo "lint-terms: ok"
 
-# dev-plan §1.5 / §7: evalexec ships as a library too, so anything outside
-# cmd/ that exits the process, grabs signals, or writes to os.Stderr would
-# misbehave inside a host process. Test files are exempt (M5 drives a real
-# subprocess to test SIGINT).
+# dev-plan §1.5 / §7: evalexec ships as a library too, so *library* code that
+# exits the process, grabs signals, or writes to os.Stderr would misbehave
+# inside a host process.
+#
+# Standalone programs are exempt, because that is precisely where these belong:
+# cmd/ is the binary, and contract/ holds the reference external components,
+# which are separate processes by definition. Test files are exempt too (M5
+# drives a real subprocess to exercise SIGINT).
 #
 # This is the cheap pre-check, available without golangci-lint. The
 # authoritative check is the forbidigo linter in .golangci.yml, which works on
@@ -72,7 +76,7 @@ lint-terms:
 # line-based, so a `//` inside a string literal truncates the rest of that
 # line; forbidigo is what closes that gap.
 lint-boundary:
-	@files=$$(git ls-files --cached --others --exclude-standard '*.go' | grep -v '^cmd/' | grep -v '_test\.go$$' | while read -r f; do [ -f "$$f" ] && echo "$$f"; done); \
+	@files=$$(git ls-files --cached --others --exclude-standard '*.go' | grep -vE '^cmd/|^contract/' | grep -v '_test\.go$$' | while read -r f; do [ -f "$$f" ] && echo "$$f"; done); \
 	if [ -z "$$files" ]; then echo "lint-boundary: ok (no files)"; exit 0; fi; \
 	hits=$$(for f in $$files; do \
 		sed 's|//.*||' "$$f" | grep -nE 'os\.Exit|signal\.Notify|os\.Stderr' | sed "s|^|$$f:|"; \

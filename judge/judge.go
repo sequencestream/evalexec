@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"net/http"
 	"slices"
@@ -30,6 +31,8 @@ import (
 	"github.com/vogo/aimodel/provider/openai"
 
 	"github.com/sequencestream/evalexec/evalspec"
+	"github.com/sequencestream/evalexec/judge/provider/httpjson"
+	"github.com/sequencestream/evalexec/judge/provider/stdiojsonl"
 	"github.com/sequencestream/evalexec/judge/transport"
 )
 
@@ -105,6 +108,17 @@ type client struct {
 	timeout   time.Duration
 	params    parameters
 	recorder  *transport.Recorder
+	closer    io.Closer
+}
+
+// Close releases any resources the transport holds, such as the subprocesses of
+// a stdio-jsonl Judge.
+func (c *client) Close() error {
+	if c.closer == nil {
+		return nil
+	}
+
+	return c.closer.Close()
 }
 
 // New builds a Judge from its configuration.
@@ -144,15 +158,21 @@ func New(cfg *evalspec.JudgeModelSpec, concurrency int) (Judge, error) {
 
 	recorder := transport.NewRecorder()
 
+	httpClient, providerOpts, err := transportFor(cfg, provider, concurrency, recorder)
+	if err != nil {
+		return nil, err
+	}
+
 	completer, err := aimodel.NewClient(
 		aimodel.WithProvider(provider),
+		aimodel.WithProviderOptions(providerOpts),
 		// Everything is passed explicitly. aimodel falls back to AI_API_KEY,
 		// OPENAI_BASE_URL and friends when a value is missing, and a run whose
 		// provenance names one endpoint while actually calling another is
 		// worse than a run that failed.
 		aimodel.WithAPIKey(apiKey),
 		aimodel.WithBaseURL(cfg.Endpoint),
-		aimodel.WithHTTPClient(newHTTPClient(concurrency, recorder)),
+		aimodel.WithHTTPClient(httpClient),
 		// A client-level backstop at twice the per-call budget. The real
 		// per-call bound is a context deadline; this only catches a transport
 		// that never returns.
@@ -168,7 +188,70 @@ func New(cfg *evalspec.JudgeModelSpec, concurrency int) (Judge, error) {
 		timeout:   timeout,
 		params:    params,
 		recorder:  recorder,
+		closer:    closerOf(httpClient),
 	}, nil
+}
+
+// transportFor builds the HTTP client and the provider options for a protocol.
+//
+// The two custom protocols need per-run configuration — an endpoint, a command —
+// and it travels through aimodel's provider options rather than through the
+// registration, because ais.Register panics on a duplicate name: each provider
+// is registered exactly once, at init.
+func transportFor(
+	cfg *evalspec.JudgeModelSpec,
+	provider string,
+	concurrency int,
+	recorder *transport.Recorder,
+) (*http.Client, any, error) {
+	switch provider {
+	case httpjson.Name:
+		key, err := credential(cfg.Auth)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return newHTTPClient(concurrency, recorder),
+			httpjson.Options{Endpoint: cfg.Endpoint, APIKey: key}, nil
+	case stdiojsonl.Name:
+		// The subprocess transport replaces the network entirely; the recorder
+		// still wraps it, so a stdio Judge's exchanges land in logs/ like any
+		// other.
+		st := stdiojsonl.NewTransport(cfg.Endpoint)
+
+		return &http.Client{Transport: recorder.Wrap(st)},
+			stdiojsonl.Options{Command: cfg.Endpoint}, nil
+	default:
+		// The built-in providers take no options, and passing any would be
+		// rejected by their factories.
+		return newHTTPClient(concurrency, recorder), nil, nil
+	}
+}
+
+// closerOf finds a transport that owns resources, so the Judge can release
+// them when the run ends.
+func closerOf(c *http.Client) io.Closer {
+	type closerTransport interface {
+		http.RoundTripper
+		io.Closer
+	}
+
+	var walk func(rt http.RoundTripper) io.Closer
+
+	walk = func(rt http.RoundTripper) io.Closer {
+		switch t := rt.(type) {
+		case nil:
+			return nil
+		case closerTransport:
+			return t
+		case interface{ Unwrap() http.RoundTripper }:
+			return walk(t.Unwrap())
+		default:
+			return nil
+		}
+	}
+
+	return walk(c.Transport)
 }
 
 // providerName maps a protocol to a registered aimodel provider.
@@ -180,8 +263,10 @@ func providerName(p evalspec.JudgeProtocol) (string, error) {
 		// Registered by importing the root aimodel package, which client.go
 		// does with a blank import of this provider.
 		return anthropic.Name, nil
-	case evalspec.JudgeHTTPJSON, evalspec.JudgeStdioJSONL:
-		return "", fmt.Errorf("%w: %q arrives in M6", ErrUnsupportedProtocol, p)
+	case evalspec.JudgeHTTPJSON:
+		return httpjson.Name, nil
+	case evalspec.JudgeStdioJSONL:
+		return stdiojsonl.Name, nil
 	default:
 		return "", fmt.Errorf("%w: %q", ErrUnsupportedProtocol, p)
 	}

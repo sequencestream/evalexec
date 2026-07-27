@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -435,9 +437,12 @@ func TestConstructionValidatesConfiguration(t *testing.T) {
 			wantErr: "unsupported protocol",
 		},
 		{
-			name:    "http-json is not wired yet",
-			mutate:  func(s *evalspec.JudgeModelSpec) { s.Protocol = evalspec.JudgeHTTPJSON },
-			wantErr: "M6",
+			name: "stdio-jsonl needs an executable",
+			mutate: func(s *evalspec.JudgeModelSpec) {
+				s.Protocol = evalspec.JudgeStdioJSONL
+				s.Endpoint = "/definitely/not/an/executable"
+			},
+			wantErr: "cannot use",
 		},
 		{
 			name: "credential environment variable is empty",
@@ -498,6 +503,46 @@ func TestCheckerIsThePreCheck(t *testing.T) {
 	bad := spec("")
 	if err := c.Check(bad); err == nil {
 		t.Error("a configuration with no endpoint must be rejected")
+	}
+}
+
+// TestEveryProtocolConstructs checks that all four Judge protocols resolve to a
+// provider. Until M6 two of them returned an error; a test asserting that would
+// now be asserting the opposite of the truth.
+func TestEveryProtocolConstructs(t *testing.T) {
+	t.Setenv(testKeyEnv, "k")
+
+	tests := []struct {
+		protocol evalspec.JudgeProtocol
+		endpoint string
+	}{
+		{protocol: evalspec.JudgeOpenAIChat, endpoint: "https://example.invalid/v1"},
+		{protocol: evalspec.JudgeAnthropicMessages, endpoint: "https://example.invalid"},
+		{protocol: evalspec.JudgeHTTPJSON, endpoint: "https://example.invalid/grade"},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.protocol), func(t *testing.T) {
+			cfg := spec(tt.endpoint)
+			cfg.Protocol = tt.protocol
+
+			if _, err := judge.New(cfg, 1); err != nil {
+				t.Errorf("New: %v", err)
+			}
+		})
+	}
+
+	// stdio-jsonl needs a real executable, so it is checked separately with one.
+	script := filepath.Join(t.TempDir(), "judge.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cfg := spec(script)
+	cfg.Protocol = evalspec.JudgeStdioJSONL
+
+	if _, err := judge.New(cfg, 1); err != nil {
+		t.Errorf("New for stdio-jsonl: %v", err)
 	}
 }
 
