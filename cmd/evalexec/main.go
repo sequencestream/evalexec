@@ -43,10 +43,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return report(stderr, err)
 	}
 
+	ctx, stop := withInterrupts(context.Background(), stderr)
+	defer stop()
+
 	// Everything below the command line is one atomic call. The binary holds
 	// no evaluation logic of its own, which is what keeps the library and the
 	// command from drifting apart.
-	res, err := evalexec.Run(context.Background(), req, evalexec.WithDiagnosticWriter(stderr))
+	res, err := evalexec.Run(ctx, req, evalexec.WithDiagnosticWriter(stderr))
 	if err != nil {
 		return report(stderr, err)
 	}

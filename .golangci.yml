@@ -64,6 +64,12 @@ linters:
       - path: _test\.go
         linters:
           - forbidigo
+      # io.EOF is how a streaming reader reports "no more input", not a fault,
+      # so the dispatcher returning nil on it is correct rather than a swallowed
+      # error. nilerr cannot tell the two apart.
+      - path: runner/runner\.go
+        linters:
+          - nilerr
       # A JSON Schema literal repeats "type" and "string" because those are
       # the schema's own keywords. Hoisting them into constants would make the
       # schema harder to read against the specification it mirrors.

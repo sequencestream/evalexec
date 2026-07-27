@@ -47,6 +47,7 @@ import (
 	_ "github.com/sequencestream/evalexec/grader/builtin" // register the built-in Graders
 	"github.com/sequencestream/evalexec/grader/declaration"
 	"github.com/sequencestream/evalexec/judge"
+	"github.com/sequencestream/evalexec/judge/transport"
 	"github.com/sequencestream/evalexec/redact"
 	"github.com/sequencestream/evalexec/result"
 	"github.com/sequencestream/evalexec/runner"
@@ -69,10 +70,11 @@ func (systemClock) Now() time.Time { return time.Now() }
 
 // config holds the resolved options.
 type config struct {
-	registry *grader.Registry
-	clock    Clock
-	diag     io.Writer
-	judge    validate.JudgeChecker
+	registry  *grader.Registry
+	clock     Clock
+	diag      io.Writer
+	judge     validate.JudgeChecker
+	debugLogs bool
 }
 
 // Option adjusts how a run executes.
@@ -108,6 +110,13 @@ func WithDiagnosticWriter(w io.Writer) Option {
 			c.diag = w
 		}
 	}
+}
+
+// WithDebugLogs retains the raw Judge exchange for every sample, not only for
+// failures. It is off by default: a successful run of ten thousand samples
+// would otherwise leave ten thousand prompt echoes on disk.
+func WithDebugLogs() Option {
+	return func(c *config) { c.debugLogs = true }
 }
 
 // WithJudgeChecker replaces the transport-level Judge pre-check. The default
@@ -222,7 +231,7 @@ func Run(ctx context.Context, req *evalspec.EvalRequest, opts ...Option) (*evals
 		return nil, err
 	}
 
-	res, err := execute(ctx, cfg, req, g, report, dir, snapshot, datasetSum)
+	res, err := execute(ctx, cfg, req, g, j, report, dir, snapshot, datasetSum)
 	if err != nil {
 		// A run-level fault leaves nothing publishable. Discarding is not
 		// tidiness: a partial directory would be indistinguishable from a
@@ -248,6 +257,7 @@ func execute(
 	cfg *config,
 	req *evalspec.EvalRequest,
 	g grader.Grader,
+	j judge.Judge,
 	report *validate.Report,
 	dir *result.Dir,
 	snapshot *redact.Snapshot,
@@ -261,6 +271,8 @@ func execute(
 		return nil, err
 	}
 
+	logs := result.NewLogWriter(dir)
+
 	outcome, runErr := runner.Run(ctx, runner.Config{
 		EvalID:        req.EvalID,
 		TaskID:        req.TaskID,
@@ -270,7 +282,12 @@ func execute(
 		GraderVersion: req.Grader.Version,
 		Parameters:    req.Grader.Parameters,
 		GraderTimeout: time.Duration(req.Grader.TimeoutMS) * time.Millisecond,
+		Concurrency:   concurrencyOf(req),
+		FailFast:      req.Execution != nil && req.Execution.FailFast,
 		Clock:         cfg.clock,
+		Recorder:      recorderOf(j),
+		Logs:          logs,
+		KeepAllLogs:   cfg.debugLogs,
 		Diag:          cfg.diag,
 	}, records)
 
@@ -301,7 +318,7 @@ func execute(
 		Status:      status,
 		StopReason:  stopReason,
 		Request:     snapshot.JSON,
-		Artifacts:   evalspec.Artifacts{Records: result.FileRecords},
+		Artifacts:   artifactsOf(logs),
 		Counts:      outcome.Counts,
 		Evaluation:  outcome.Evaluation,
 		Usage: evalspec.ResultUsage{JudgeModel: evalspec.ModelUsage{
@@ -334,6 +351,31 @@ func execute(
 	}
 
 	return res, nil
+}
+
+// artifactsOf names the files a run produced. The logs directory is listed
+// only when something was written to it: naming an absent directory would send
+// a reader looking for diagnostics that do not exist.
+func artifactsOf(logs *result.LogWriter) evalspec.Artifacts {
+	a := evalspec.Artifacts{Records: result.FileRecords}
+	if logs.HasLogs() {
+		a.Logs = result.DirLogs
+	}
+
+	return a
+}
+
+// recorderOf exposes the Judge's transport recorder, when it has one. A custom
+// Judge implementation need not, in which case no exchanges are retained.
+func recorderOf(j judge.Judge) runner.Recorder {
+	r, ok := j.(interface {
+		Recorder() *transport.Recorder
+	})
+	if !ok {
+		return nil
+	}
+
+	return r.Recorder()
 }
 
 // failedResult marks a result as a run-level fault, for the caller that wants

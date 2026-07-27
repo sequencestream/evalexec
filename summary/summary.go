@@ -161,9 +161,21 @@ func (a *Accumulator) score() evalspec.ScoreStats {
 //
 // A run that processed everything is completed even if every evaluation
 // failed: the top-level status describes the run, not the results.
+//
+// The skipped count decides, not whether a stop was requested. A fail-fast
+// signal that arrives after the last sample was already dispatched has nothing
+// left to stop, and reporting such a run as cancelled would both mislead and
+// break the rule that a cancelled run has skipped samples.
 func Status(skipped int, stopped bool, reason evalspec.StopReason) (evalspec.RunStatus, *evalspec.StopReason) {
-	if !stopped && skipped == 0 {
+	if skipped == 0 {
 		return evalspec.RunCompleted, nil
+	}
+
+	if !stopped {
+		// Samples went missing without a stop. The caller checks the counting
+		// identities before writing, so this is reported rather than papered
+		// over.
+		return evalspec.RunFailed, nil
 	}
 
 	r := reason

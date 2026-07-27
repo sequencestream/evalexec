@@ -71,7 +71,12 @@ type Judge interface {
 // evaluation failed; a cancelled sample was never finished at all and must be
 // recorded as skipped. Conflating them would report work that never happened
 // as work that happened badly.
-var ErrCancelled = errors.New("judge: the call was cancelled because the run is stopping")
+//
+// It wraps context.Canceled so that a caller which only knows about the
+// standard library — the runner, which must not import this package and pull
+// the vendor SDK along with it — can recognize a cancellation with a single
+// errors.Is check.
+var ErrCancelled = fmt.Errorf("judge: the call was cancelled because the run is stopping: %w", context.Canceled)
 
 // ErrUnsupportedProtocol reports a Judge protocol this build cannot reach.
 var ErrUnsupportedProtocol = errors.New("judge: unsupported protocol")
@@ -259,8 +264,9 @@ func (c *client) Complete(ctx context.Context, p Prompt) (Completion, error) {
 	}, nil
 }
 
-// Recorder exposes the transport recorder so a Grader can attach the captured
-// exchange to a failing sample.
+// Recorder exposes the transport recorder, so the runner can attach the raw
+// exchange to a failing sample without this package knowing about result
+// directories.
 func (c *client) Recorder() *transport.Recorder { return c.recorder }
 
 // buildRequest assembles the chat request from the prompt and the configured

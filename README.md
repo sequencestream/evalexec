@@ -17,10 +17,10 @@ evalexec \
 
 ## 状态
 
-**开发中。** 按 `doc/dev-plan.md` 的 M0–M7 推进，当前完成到 **M4**。
+**开发中。** 按 `doc/dev-plan.md` 的 M0–M7 推进，当前完成到 **M5** ——
+即 dev-plan 的 **v0.1.0 MVP** 节点，`04-mvp-scope.md` 的全部「MVP 必做」已完成。
 
-规则 Grader 与 LLM Judge 均已可用，已对 DeepSeek 真实端点做过端到端验证。
-并发与中断在 M5。
+已对 DeepSeek 真实端点做过端到端验证。外部 Grader / Judge 协议在 M6。
 
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
@@ -29,7 +29,7 @@ evalexec \
 | M2 | 参数、6 步前置校验、退出码、原子目录 | ✅ |
 | M3 | 串行执行 + 4 个规则 Grader + 根包 `Run` | ✅ |
 | M4 | aimodel Judge 接入 + `llm_judge` | ✅ |
-| M5 | 并发、超时、fail-fast、中断、`skipped` 补写 | ⏳ |
+| M5 | 并发、超时、fail-fast、中断、`skipped` 补写 | ✅ |
 | M6 | 外部 Grader / Judge 协议互操作 | ⏳ |
 | M7 | 跨语言一致性验证、二进制与库双发布 | ⏳ |
 
@@ -59,6 +59,40 @@ evalexec \
 - 不解释分数：`score` / `label` 原样来自 Grader，`min_score` / `max_score` 只透传，是否达标由外部判断。
 - 输出目录已存在且非空则拒绝运行，**不提供 `--force`**。
 - **不重试、不限流**：429 / 5xx 计为 `judge_error`；需要重试请由上层重跑整个评估。
+
+## 并发与停止
+
+```bash
+evalexec --concurrency 8 --fail-fast ...
+```
+
+**`records.jsonl` 的行数恒等于数据集行数，在每一条退出路径上都成立** —— 正常跑完、
+fail-fast 停止、用户中断都一样。这是"部分结果仍然可信"与"结果被截断了"的分界。
+
+| 情形 | `status` | `stop_reason` | 退出码 |
+|---|---|---|---:|
+| 全部处理完（即使全部 `fail`） | `completed` | null | `0` |
+| fail-fast 停止 | `cancelled` | `fail_fast` | **`0`** |
+| 用户中断 | `cancelled` | `interrupt` | `130` |
+| 运行级故障 | `failed` | — | `3` |
+
+**fail-fast 返回 0**：它是调用方显式请求的停止策略，命令做了它被要求做的事。
+结果不完整由 `status` 与 `counts.skipped` 表达，不由退出码表达。
+而且**只有 `evaluation.status=fail` 会触发它** —— 分数高低永不触发，因为 EvalExec
+不解释分数，无从判断 0 分算不算"坏"。
+
+**被取消的样本记 `skipped`，不是 `fail`。** 一个中途被放弃的样本从未完成，把它记成
+超时或内部错误，等于把"从未发生的工作"报成"做坏了的工作"。
+
+中断的升级规则：第一次停止派发并走完补写与发布；第二次**忽略** —— 补写正是让部分结果
+可信的那一步；第三次放弃并**不发布**目录。因为发布是一次 `rename`，调用方永远不会看到
+半成品目录，只会看到"目录不存在"。
+
+两条不保证的事：
+
+- **行序不保证。** 并发下记录按完成顺序写出。每行携带 `sequence`，消费方自行排序。
+- **`score.mean` 不保证跨并发度逐位一致。** 浮点加法不满足结合律，而记录到达顺序随
+  并发度变化。差异在 1e-15 量级；要逐位复现请用 `--concurrency 1`。
 
 ## 内置 Grader
 
@@ -131,6 +165,10 @@ make test       # go test -race ./...
 make lint       # 词根守卫 + 库路径边界守卫 + 依赖面守卫 + golangci-lint
 make test-e2e   # 真实模型端到端；需 OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_MODEL
 ```
+
+`make lint` 包含 `lint-secrets`：它跑出一个真实结果目录并扫描全部文件（含 `logs/`），
+断言不含哨兵密钥、不含任何密钥形态、`Authorization` 已被替换 —— 并另跑一个测试验证
+**扫描器确实会触发**。一个从未报过警的泄漏检测器，和一个失效的检测器无法区分。
 
 三条守卫是硬约束，不是建议：
 
