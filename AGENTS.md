@@ -1,5 +1,11 @@
 # Agent Guide
 
+## Documentation
+
+- `doc/architecture.md` — How the pieces fit together: program structure and execution order.
+- `doc/api.md` — Reference for driving EvalExec via the command line or the Go library.
+- `doc/protocol.md` — Data model and wire specification for producing/consuming EvalExec documents, or implementing a Grader/Judge in any language.
+
 ## Code Style
 
 - Do not record development-process information in comments.
