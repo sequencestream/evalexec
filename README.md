@@ -24,14 +24,9 @@ import this module directly instead of forking processes repeatedly.
 
 - **Atomic by design.** One command, one Grader, one result directory. No
   subcommands, no hidden state.
-- **Two deliverables from one codebase.** A CLI binary and a Go library sharing
-  the same entry point.
 - **Five built-in Graders** plus external Graders over HTTP or stdio, in any
   language, and an LLM Judge over OpenAI-compatible, Anthropic Messages or
   EvalExec's own protocols.
-- **Errors are never disguised as low scores**, results **survive interruption**
-  and are **published atomically** — the three properties the rest of this
-  README elaborates.
 - **Traceable.** Every result carries dataset and request checksums plus the
   build that produced it.
 - **Secrets never touch disk.** Credentials are referenced only by environment
@@ -101,28 +96,9 @@ Every field of every document is specified in
 
 ## Boundaries
 
-- `task_id` is passed through untouched; tasks are not abstracted.
 - Execution and evaluation are separate: EvalExec grades existing Sessions and
   never calls the agent.
 - Protocol over SDK: JSON/JSONL and HTTP/stdio bind to no language.
-- Execution errors are never disguised as low scores. An evaluation is
-  `success` or `fail`; a `fail` carries a reason code and **is not scored
-  zero**. Samples that never ran are recorded as `skipped`.
-- Scores are not interpreted. `score` / `label` come from the Grader verbatim;
-  `min_score` / `max_score` are passed through. Whether a result is good enough
-  is decided elsewhere.
-- An existing, non-empty output directory is refused. There is **no
-  `--force`**.
-- **No retries, no rate limiting.** 429 and 5xx are recorded as `judge_error`.
-  To retry, re-run the whole evaluation from above.
-
-## Stability layers
-
-The public surface is deliberately small — everything else lives under
-`internal/` and is enforced by the compiler. What remains is declared in two
-layers: the protocol types are the most stable, the Go API follows from v1.0.
-Which package sits where is tabulated in
-[doc/architecture.md](./doc/architecture.md#stability-layers).
 
 ## Concurrency and stopping
 
