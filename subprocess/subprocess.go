@@ -32,7 +32,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
 )
 
 // maxLineBytes caps one response line at 32 MB, matching the dataset reader.
@@ -171,7 +170,7 @@ func (p *Process) ensureStarted() error {
 	//nolint:gosec,noctx // the command is the run's own configuration; lifetime is managed in Call
 	cmd := exec.Command(p.command, p.args...)
 	// Its own process group, so cancellation can take the whole tree.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	configureProcessGroup(cmd)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -241,15 +240,7 @@ func (p *Process) killLocked() error {
 		_ = p.stdin.Close()
 	}
 
-	pid := p.cmd.Process.Pid
-
-	// Negative pid means the process group: a script that forked leaves
-	// orphans otherwise, and an orphan holding the pipe open is indistinguishable
-	// from a process that has not answered yet.
-	if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
-		// Fall back to the process itself; the group may already be gone.
-		_ = p.cmd.Process.Kill()
-	}
+	killTree(p.cmd)
 
 	_ = p.cmd.Wait()
 	p.cmd = nil
@@ -391,9 +382,5 @@ func Executable(path string) error {
 		return fmt.Errorf("subprocess: %s is a directory, not an executable", path)
 	}
 
-	if info.Mode().Perm()&0o111 == 0 {
-		return fmt.Errorf("subprocess: %s is not executable", path)
-	}
-
-	return nil
+	return checkExecutable(path, info)
 }
