@@ -46,7 +46,6 @@ import (
 	"github.com/sequencestream/evalexec/grader"
 	_ "github.com/sequencestream/evalexec/internal/grader/builtin" // register the built-in Graders
 	"github.com/sequencestream/evalexec/internal/grader/external"
-	"github.com/sequencestream/evalexec/judge"
 	"github.com/sequencestream/evalexec/internal/judge/transport"
 	"github.com/sequencestream/evalexec/internal/redact"
 	"github.com/sequencestream/evalexec/internal/result"
@@ -54,6 +53,7 @@ import (
 	"github.com/sequencestream/evalexec/internal/summary"
 	"github.com/sequencestream/evalexec/internal/validate"
 	"github.com/sequencestream/evalexec/internal/version"
+	"github.com/sequencestream/evalexec/judge"
 )
 
 // StepRun is the step name reported for run-level faults.

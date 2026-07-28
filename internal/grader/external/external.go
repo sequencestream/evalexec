@@ -14,9 +14,8 @@
 //
 // # Stability
 //
-// L3 component. Changeable during v0; from v1.0 it follows the Go
-// compatibility promise. The wire contract itself is documented in
-// doc/protocol.md and versioned with the specification.
+// Internal package: no compatibility promise. The wire contract itself is
+// documented in doc/protocol.md and versioned with the specification.
 package external
 
 import (

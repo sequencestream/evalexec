@@ -11,8 +11,7 @@
 //
 // # Stability
 //
-// L3 component. Changeable during v0; from v1.0 it follows the Go
-// compatibility promise.
+// Internal package: no compatibility promise.
 package runner
 
 import (
@@ -24,10 +23,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sequencestream/evalexec/internal/dataset"
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
+	"github.com/sequencestream/evalexec/internal/dataset"
 	"github.com/sequencestream/evalexec/internal/judge/transport"
 	"github.com/sequencestream/evalexec/internal/summary"
 )

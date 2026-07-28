@@ -9,8 +9,8 @@ import (
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/judge"
 	"github.com/sequencestream/evalexec/internal/judge/transport"
+	"github.com/sequencestream/evalexec/judge"
 )
 
 // JudgeFactory builds the Judge an llm_judge Grader will use.

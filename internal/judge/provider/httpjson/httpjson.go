@@ -12,8 +12,8 @@
 //
 // # Stability
 //
-// L3 component. The wire contract is documented in doc/protocol.md and
-// versioned with the specification.
+// Internal package: no compatibility promise. The wire contract is documented
+// in doc/protocol.md and versioned with the specification.
 package httpjson
 
 import (

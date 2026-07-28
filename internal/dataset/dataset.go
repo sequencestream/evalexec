@@ -11,8 +11,7 @@
 //
 // # Stability
 //
-// L3 component. Changeable during v0; from v1.0 it follows the Go
-// compatibility promise.
+// Internal package: no compatibility promise.
 package dataset
 
 import (

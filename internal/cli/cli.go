@@ -6,10 +6,8 @@
 //
 // # Stability
 //
-// L4 implementation detail. This package exists to serve cmd/evalexec and
-// makes **no compatibility promise** — it may change in any release. It is
-// exported only so the binary and its tests can share it; downstream code
-// should call evalexec.Run with an evalspec.EvalRequest instead.
+// Internal package: no compatibility promise. It exists to serve cmd/evalexec;
+// downstream code calls evalexec.Run with an evalspec.EvalRequest instead.
 package cli
 
 import (

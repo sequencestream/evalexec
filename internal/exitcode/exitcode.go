@@ -9,8 +9,8 @@
 //
 // # Stability
 //
-// L3 component. The exit code values themselves are a user-facing contract and
-// will not change; the Go API follows the compatibility promise from v1.0.
+// Internal package: no compatibility promise on the Go API. The exit code
+// values themselves are a user-facing contract and will not change.
 package exitcode
 
 import (

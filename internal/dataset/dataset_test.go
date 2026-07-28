@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sequencestream/evalexec/internal/dataset"
 	"github.com/sequencestream/evalexec/evalspec"
+	"github.com/sequencestream/evalexec/internal/dataset"
 )
 
 func writeDataset(t *testing.T, content string) string {

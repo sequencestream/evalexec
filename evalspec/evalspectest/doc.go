@@ -19,6 +19,6 @@
 //
 // # Stability
 //
-// L3 component. Changeable during v0; from v1.0 it follows the Go
-// compatibility promise.
+// L2 Go API. Changeable during v0; from v1.0 it follows the Go compatibility
+// promise.
 package evalspectest

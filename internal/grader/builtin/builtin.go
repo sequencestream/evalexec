@@ -9,9 +9,8 @@
 //
 // # Stability
 //
-// L3 component. Changeable during v0; from v1.0 it follows the Go
-// compatibility promise. The graders' observable behaviour is pinned by the
-// shared fixtures.
+// Internal package: no compatibility promise. The graders' observable
+// behaviour is pinned by the shared fixtures.
 package builtin
 
 import (

@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sequencestream/evalexec/internal/cli"
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/evalspec"
+	"github.com/sequencestream/evalexec/internal/cli"
 )
 
 // write drops a file into dir and returns its path.

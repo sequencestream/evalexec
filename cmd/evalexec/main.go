@@ -17,8 +17,8 @@ import (
 	"slices"
 
 	evalexec "github.com/sequencestream/evalexec"
-	"github.com/sequencestream/evalexec/internal/cli"
 	"github.com/sequencestream/evalexec/evalerr"
+	"github.com/sequencestream/evalexec/internal/cli"
 	"github.com/sequencestream/evalexec/internal/exitcode"
 	"github.com/sequencestream/evalexec/internal/version"
 )
