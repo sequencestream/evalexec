@@ -65,6 +65,13 @@ type Clock interface {
 	Now() time.Time
 }
 
+// JudgeChecker validates a Judge configuration by whatever means the transport
+// requires — typically by constructing the client, so that an unusable
+// endpoint fails during the pre-check rather than on the first call.
+type JudgeChecker interface {
+	Check(spec *evalspec.JudgeModelSpec) error
+}
+
 type systemClock struct{}
 
 func (systemClock) Now() time.Time { return time.Now() }
@@ -75,7 +82,7 @@ type config struct {
 	clock     Clock
 	ids       IDGenerator
 	diag      io.Writer
-	judge     validate.JudgeChecker
+	judge     JudgeChecker
 	debugLogs bool
 }
 
@@ -134,12 +141,12 @@ func WithDebugLogs() Option {
 // WithJudgeChecker replaces the transport-level Judge pre-check. The default
 // constructs the real client, so an unusable endpoint fails before the first
 // call rather than on it.
-func WithJudgeChecker(j validate.JudgeChecker) Option {
+func WithJudgeChecker(j JudgeChecker) Option {
 	return func(c *config) { c.judge = j }
 }
 
 // judgeChecker returns the pre-check to use for this request.
-func (c *config) judgeChecker(req *evalspec.EvalRequest) validate.JudgeChecker {
+func (c *config) judgeChecker(req *evalspec.EvalRequest) JudgeChecker {
 	if c.judge != nil {
 		return c.judge
 	}
