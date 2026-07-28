@@ -269,7 +269,7 @@ func TestErrorMessageOmitsTheResponseBody(t *testing.T) {
 	}
 }
 
-// TestCancellationIsNotATimeout is dev-plan's headline risk. A cancelled call
+// TestCancellationIsNotATimeout guards the headline risk. A cancelled call
 // means the sample was never finished — it belongs to the run's stop path and
 // must not be recorded as a failed evaluation at all.
 func TestCancellationIsNotATimeout(t *testing.T) {
@@ -507,8 +507,8 @@ func TestCheckerIsThePreCheck(t *testing.T) {
 }
 
 // TestEveryProtocolConstructs checks that all four Judge protocols resolve to a
-// provider. Until M6 two of them returned an error; a test asserting that would
-// now be asserting the opposite of the truth.
+// provider. All four are implemented; a test asserting otherwise for any of
+// them would be asserting the opposite of the truth.
 func TestEveryProtocolConstructs(t *testing.T) {
 	t.Setenv(testKeyEnv, "k")
 

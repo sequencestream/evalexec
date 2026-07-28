@@ -202,7 +202,7 @@ func TestDiffIdentical(t *testing.T) {
 	}
 }
 
-// TestCheckEvalIDConsistency covers acceptance criterion 9: every record must
+// TestCheckEvalIDConsistency covers the correlation rule: every record must
 // carry the run's eval_id. This runs before normalization erases the value,
 // because otherwise normalizing would conceal exactly this defect.
 func TestCheckEvalIDConsistency(t *testing.T) {

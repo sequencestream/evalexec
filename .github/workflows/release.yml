@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build and release'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  MODULE: github.com/sequencestream/evalexec
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          check-latest: true
+
+      # A release that ships a failing build is worse than a late release.
+      - name: Test
+        run: go test ./...
+
+      - name: Build all targets
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          # CommitDate rather than the build time: two builds of the same commit
+          # should stamp the same version, or provenance stops identifying a
+          # build and starts identifying a moment.
+          COMMIT=$(git rev-parse --short HEAD)
+          DATE=$(git show -s --format=%cI HEAD)
+
+          LDFLAGS="-s -w \
+            -X ${MODULE}/version.Version=${TAG} \
+            -X ${MODULE}/version.Commit=${COMMIT} \
+            -X ${MODULE}/version.Date=${DATE}"
+
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            GOOS=${target%/*}
+            GOARCH=${target#*/}
+            NAME="evalexec_${TAG}_${GOOS}_${GOARCH}"
+
+            # The archive is staged in its own directory so the extracted tree
+            # is self-describing rather than loose files in the user's cwd.
+            stage="dist/${NAME}"
+            mkdir -p "${stage}"
+
+            BIN=evalexec
+            if [ "${GOOS}" = "windows" ]; then BIN=evalexec.exe; fi
+
+            CGO_ENABLED=0 GOOS="${GOOS}" GOARCH="${GOARCH}" \
+              go build -trimpath -ldflags "${LDFLAGS}" -o "${stage}/${BIN}" ./cmd/evalexec
+
+            cp README.md LICENSE "${stage}/"
+            # The fixtures travel with the release so an implementer in another
+            # language can self-test without cloning the repository.
+            cp -R fixtures/data "${stage}/fixtures-data"
+
+            if [ "${GOOS}" = "windows" ]; then
+              (cd dist && zip -qr "${NAME}.zip" "${NAME}")
+            else
+              tar -czf "dist/${NAME}.tar.gz" -C dist "${NAME}"
+            fi
+            rm -rf "${stage}"
+          done
+
+          (cd dist && sha256sum ./* > checksums.txt)
+          ls -l dist
+
+      - name: Version is stamped
+        run: |
+          set -euo pipefail
+          tar -xzf dist/evalexec_*_linux_amd64.tar.gz -C /tmp
+          /tmp/evalexec_*_linux_amd64/evalexec --version
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          # A pre-release tag stays a pre-release; -rc1 must not become "latest".
+          prerelease=""
+          case "${TAG}" in *-*) prerelease="--prerelease" ;; esac
+
+          gh release create "${TAG}" dist/* \
+            --title "${TAG}" \
+            --generate-notes \
+            ${prerelease}

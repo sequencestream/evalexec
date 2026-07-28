@@ -172,7 +172,7 @@ func TestVerdictParsing(t *testing.T) {
 	}
 }
 
-// TestScoreIsPassedThroughUnjudged is acceptance criterion 12. min_score and
+// TestScoreIsPassedThroughUnjudged pins the no-interpretation rule. min_score and
 // max_score are scale metadata; EvalExec neither clamps to them nor rejects a
 // score outside them, because interpreting a score is not its job.
 func TestScoreIsPassedThroughUnjudged(t *testing.T) {
@@ -273,8 +273,8 @@ func TestJudgeErrorsBecomeFailures(t *testing.T) {
 	}
 }
 
-// TestCancellationPropagates is the distinction dev-plan flags as the single
-// easiest thing to get wrong. A cancelled call is not a failed evaluation: the
+// TestCancellationPropagates guards the single easiest distinction to get
+// wrong. A cancelled call is not a failed evaluation: the
 // sample was never finished, so it belongs to the run's stop path and must
 // reach the runner as an error rather than as a fail record.
 func TestCancellationPropagates(t *testing.T) {

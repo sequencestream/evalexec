@@ -21,7 +21,7 @@ func TestRunVersion(t *testing.T) {
 		t.Errorf("stdout = %q, want %q", got, want)
 	}
 
-	// stdout stays machine-readable: diagnostics belong on stderr (dev-plan §1.5).
+	// stdout stays machine-readable: diagnostics belong on stderr.
 	if stderr.Len() != 0 {
 		t.Errorf("stderr = %q, want empty", stderr.String())
 	}
@@ -30,7 +30,7 @@ func TestRunVersion(t *testing.T) {
 func TestRunUnknownFlagIsArgumentError(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	// Exit code 2 is the argument-error code (03-cli-and-execution.md §4).
+	// Exit code 2 is the argument-error code.
 	if code := run([]string{"--no-such-flag"}, &stdout, &stderr); code != 2 {
 		t.Errorf("exit code = %d, want 2", code)
 	}

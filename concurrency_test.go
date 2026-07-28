@@ -50,8 +50,8 @@ func TestFailFastCaseEndToEnd(t *testing.T) {
 	assertLineCountIdentity(t, req, gotRecords)
 }
 
-// TestFailFastExitsZero is acceptance criterion 17, and the mapping most often
-// written backwards. Fail-fast is a stopping policy the caller asked for, so
+// TestFailFastExitsZero pins the mapping most often written backwards.
+// Fail-fast is a stopping policy the caller asked for, so
 // the command did what it was told; the incompleteness is reported by status
 // and counts, not by the exit code.
 func TestFailFastExitsZero(t *testing.T) {

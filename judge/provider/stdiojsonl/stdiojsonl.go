@@ -12,8 +12,8 @@
 //
 // # Stability
 //
-// L3 component. The wire contract is documented in contract/ and versioned with
-// the specification.
+// L3 component. The wire contract is documented in doc/protocol.md and
+// versioned with the specification.
 package stdiojsonl
 
 import (

@@ -57,15 +57,10 @@ linters:
           - goconst
           - noctx
       # Standalone programs are where exiting, signal handling and stderr
-      # belong: cmd/ is the binary, and contract/ holds reference external
-      # components, which are separate processes by definition.
+      # belong: cmd/ is the binary, and examples/ is a separate module.
       - path: ^cmd/
         linters:
           - forbidigo
-      - path: ^contract/
-        linters:
-          - forbidigo
-          - goconst
       - path: ^examples/
         linters:
           - forbidigo

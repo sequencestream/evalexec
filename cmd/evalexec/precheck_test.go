@@ -235,7 +235,7 @@ func TestSecretFlagsAreRejected(t *testing.T) {
 }
 
 // TestValidRunReachesExecution checks the happy path: a well-formed request
-// passes all six checks. What follows is M3's job.
+// passes all six checks. What follows is execution's job.
 func TestValidRunReachesExecution(t *testing.T) {
 	root := t.TempDir()
 
@@ -269,8 +269,8 @@ func TestValidRunReachesExecution(t *testing.T) {
 	}
 }
 
-// TestSingleInvocationCompletesARun is acceptance criterion 1 directly: one
-// command line, no subcommand, one complete result.
+// TestSingleInvocationCompletesARun pins the atomic contract: one command
+// line, no subcommand, one complete result.
 //
 // TestValidRunReachesExecution above checks the same path from the other end —
 // that nothing rejects it — while this one checks that a result actually lands.
@@ -325,7 +325,7 @@ func TestSingleInvocationCompletesARun(t *testing.T) {
 	}
 }
 
-// TestTaskIDIsEchoedVerbatim is acceptance criterion 4: task_id is checked for
+// TestTaskIDIsEchoedVerbatim pins the pass-through: task_id is checked for
 // non-emptiness and nothing else.
 //
 // It is a correlation key, not a domain object: no lookup, no normalization, no

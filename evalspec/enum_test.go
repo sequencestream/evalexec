@@ -61,8 +61,8 @@ func TestEnumIsValid(t *testing.T) {
 			bad: []interface{ IsValid() bool }{
 				evalspec.RecordStatus(""),
 				evalspec.RecordStatus("cancelled"),
-				// 03-cli-and-execution.md once mentioned an "error" sample
-				// state; the core spec's two-valued definition wins.
+				// A record is executed or it is not; there is no third
+				// "error" sample state.
 				evalspec.RecordStatus("error"),
 			},
 		},

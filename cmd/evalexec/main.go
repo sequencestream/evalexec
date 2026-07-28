@@ -1,6 +1,6 @@
 // Command evalexec runs exactly one evaluation: it reads one EvalRequest,
 // grades a dataset with one Grader, and writes one EvalResult directory.
-// There are no subcommands — see doc/dev-plan.md for the boundary this holds.
+// There are no subcommands: one invocation performs exactly one evaluation.
 //
 // This file is the only place in the module allowed to call os.Exit, install
 // signal handlers, or write to os.Stderr directly; everything below it is a

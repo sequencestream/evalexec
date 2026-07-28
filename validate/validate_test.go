@@ -460,7 +460,7 @@ func TestNoDirectoryIsCreated(t *testing.T) {
 //
 // A downstream Grader that has not declared its parameter names should not have
 // every parameter rejected with a message reading "accepts []" — that failure
-// mode was found by the downstream smoke test in M7. Declaring the list buys
+// mode is what the nil case exists to avoid. Declaring the list buys
 // the misspelling check; leaving it nil gives that up, which is the author's
 // choice to make.
 func TestUndeclaredParamsAreNotPoliced(t *testing.T) {

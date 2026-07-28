@@ -1,8 +1,11 @@
 # EvalExec
 
-一次进程调用 = 一个 `EvalRequest` → 一个 Grader → 一个 `EvalResult`。
+One process call = one `EvalRequest` → one Grader → one `EvalResult`.
 
-EvalExec 不建设评估平台，也不提供组合工作流。它只完成一个原子操作：接收一个评估请求，用**一个** Grader 跑完一个数据集，输出一个结果目录。它**不执行被评 Agent**，只消费上游已经产生的 Session 记录。
+EvalExec is not an evaluation platform and offers no composed workflows. It
+performs a single atomic operation: take one evaluation request, run **one**
+Grader over one dataset, write one result directory. It does **not run the
+agent under evaluation** — it consumes Session records produced upstream.
 
 ```bash
 evalexec \
@@ -13,105 +16,172 @@ evalexec \
   --output-dir ./results/relevance
 ```
 
-需要两个 Grader？调用两次。循环、并行、重试、结果合并与质量门禁都由上层编排器承担 —— 而编排器可以直接 import 本模块，不必反复 fork 进程。
+Need two Graders? Call it twice. Loops, parallelism, retries, result merging
+and quality gates belong to the orchestrator above — and that orchestrator can
+import this module directly instead of forking processes repeatedly.
 
-## 状态
+## Features
 
-**M0–M7 全部完成**，`doc/dev-plan.md` 的规划已走完。
+- **Atomic by design.** One command, one Grader, one result directory. No
+  subcommands, no hidden state.
+- **Two deliverables from one codebase.** A CLI binary and a Go library sharing
+  the same entry point.
+- **Five built-in Graders** plus external Graders over HTTP or stdio, in any
+  language, and an LLM Judge over OpenAI-compatible, Anthropic Messages or
+  EvalExec's own protocols.
+- **Errors are never disguised as low scores**, results **survive interruption**
+  and are **published atomically** — the three properties the rest of this
+  README elaborates.
+- **Traceable.** Every result carries dataset and request checksums plus the
+  build that produced it.
+- **Secrets never touch disk.** Credentials are referenced only by environment
+  variable name.
 
-21 条验收标准逐条对应到具体测试函数，见 [doc/acceptance.md](./doc/acceptance.md)。
-已对 DeepSeek 真实端点做过端到端验证；同一组 fixture 在 Go 与 Python 的外部实现下
-判决一致，且结果文档可由一个纯标准库的 Python 脚本独立校验。
+## Install
 
-尚未打 tag：发布是仓库所有者的决定，不是开发阶段的动作。`goreleaser` 配置与
-`examples/consumer` 冒烟仓库已就绪并在 CI 中验证。
+Download a binary for linux, macOS or Windows (amd64 / arm64) from the
+[releases page](https://github.com/sequencestream/evalexec/releases), or build
+from source:
 
-| 里程碑 | 内容 | 状态 |
-|---|---|---|
-| M0 | 工程基线、CI、守卫、aimodel 打通 | ✅ |
-| M1 | `evalspec` 协议类型 + 跨语言 fixtures | ✅ |
-| M2 | 参数、6 步前置校验、退出码、原子目录 | ✅ |
-| M3 | 串行执行 + 4 个规则 Grader + 根包 `Run` | ✅ |
-| M4 | aimodel Judge 接入 + `llm_judge` | ✅ |
-| M5 | 并发、超时、fail-fast、中断、`skipped` 补写 | ✅ |
-| M6 | 外部 Grader / Judge 协议互操作 | ✅ |
-| M7 | 跨语言一致性验证、二进制与库双发布 | ✅ |
+```bash
+go install github.com/sequencestream/evalexec/cmd/evalexec@latest
+```
 
-## 两个交付物
+As a library:
 
-本项目**不使用 `internal/`**，两个交付物平级：
+```bash
+go get github.com/sequencestream/evalexec
+```
 
-1. **二进制** `evalexec` —— 原子 CLI；
-2. **Go 库** `github.com/sequencestream/evalexec` —— 供其他项目 import，复用协议类型、实现自定义 Grader、或把评估执行嵌入自己的编排器。
+## Quick start
 
-代价是所有包都在公开 API 面上，因此稳定性分层声明如下：
+A dataset is JSONL, one already-executed agent session per line:
 
-| 层 | 包 | 承诺 |
-|---|---|---|
-| **L1 协议** | `evalspec`、`fixtures` | 与 `spec_version` 同生命周期。`evalexec/v1alpha1` 内只增可选字段 |
-| **L2 扩展点** | 根包 `Run`、`grader`、`judge` | v1.0 后遵守 Go 兼容性承诺；接口刻意收窄 |
-| **L3 组件** | `dataset`、`validate`、`runner`、`summary`、`result`、`exitcode`、`redact`、`version` | v0 期间可变更，v1.0 起遵守兼容性承诺 |
-| **L4 实现细节** | `cli` | **不承诺兼容**，不建议下游依赖 |
+```jsonl
+{"case_id":"c1","input":{"question":"order status?"},"output":{"text":"Shipped"},"reference":{"expected_output":{"text":"Shipped"}}}
+{"case_id":"c2","input":{"question":"refund?"},"output":{"text":"7 days"},"reference":{"expected_output":{"text":"14 days"}}}
+```
 
-## 边界
+A Grader configuration:
 
-- 一次命令、一个 Grader、一个结果；没有 `run` / `validate` / `gate` 子命令。
-- 不抽象 Task，只透传 `task_id`。
-- 执行与评估分离：EvalExec 消费已有 Session，不调用被评 Agent。
-- 协议优先于 SDK：JSON/JSONL 与 HTTP/stdio 协议不绑定任何语言。
-- 执行错误不伪装成低分：评估状态只有 `success` / `fail`，`fail` 携带原因码且**不计零分**；未执行的样本记 `skipped`。
-- 不解释分数：`score` / `label` 原样来自 Grader，`min_score` / `max_score` 只透传，是否达标由外部判断。
-- 输出目录已存在且非空则拒绝运行，**不提供 `--force`**。
-- **不重试、不限流**：429 / 5xx 计为 `judge_error`；需要重试请由上层重跑整个评估。
+```json
+{
+  "id": "order-status",
+  "version": "v1",
+  "protocol": "builtin",
+  "entry": "exact_match",
+  "requires": ["input", "output", "reference"],
+  "requires_judge": false
+}
+```
 
-## 并发与停止
+Run it:
+
+```bash
+evalexec --task-id demo \
+  --dataset ./sessions.jsonl \
+  --grader ./grader.json \
+  --output-dir ./results/demo
+```
+
+The result directory:
+
+```
+results/demo/
+  result.json          counts, score statistics, provenance
+  records.jsonl        one line per dataset row
+  checksums.sha256     covers result.json and records.jsonl
+  errors.jsonl         diagnostics, when there were any
+  logs/                raw Judge exchanges, when there were any
+```
+
+Every field of every document is specified in
+[doc/protocol.md](./doc/protocol.md); the full flag list is in
+[doc/api.md](./doc/api.md).
+
+## Boundaries
+
+- `task_id` is passed through untouched; tasks are not abstracted.
+- Execution and evaluation are separate: EvalExec grades existing Sessions and
+  never calls the agent.
+- Protocol over SDK: JSON/JSONL and HTTP/stdio bind to no language.
+- Execution errors are never disguised as low scores. An evaluation is
+  `success` or `fail`; a `fail` carries a reason code and **is not scored
+  zero**. Samples that never ran are recorded as `skipped`.
+- Scores are not interpreted. `score` / `label` come from the Grader verbatim;
+  `min_score` / `max_score` are passed through. Whether a result is good enough
+  is decided elsewhere.
+- An existing, non-empty output directory is refused. There is **no
+  `--force`**.
+- **No retries, no rate limiting.** 429 and 5xx are recorded as `judge_error`.
+  To retry, re-run the whole evaluation from above.
+
+## Stability layers
+
+The project deliberately does not use `internal/`, so every package sits on the
+public API surface. Stability is therefore declared in four layers — the
+protocol types are the most stable, `cli` promises nothing. Which package sits
+where is tabulated in
+[doc/architecture.md](./doc/architecture.md#stability-layers).
+
+## Concurrency and stopping
 
 ```bash
 evalexec --concurrency 8 --fail-fast ...
 ```
 
-**`records.jsonl` 的行数恒等于数据集行数，在每一条退出路径上都成立** —— 正常跑完、
-fail-fast 停止、用户中断都一样。这是"部分结果仍然可信"与"结果被截断了"的分界。
+**`records.jsonl` always has exactly as many lines as the dataset** — on a
+normal finish, after a fail-fast stop, and after a user interrupt alike. That
+identity is the line between "partial but still trustworthy" and "truncated".
 
-| 情形 | `status` | `stop_reason` | 退出码 |
+| Situation | `status` | `stop_reason` | Exit |
 |---|---|---|---:|
-| 全部处理完（即使全部 `fail`） | `completed` | null | `0` |
-| fail-fast 停止 | `cancelled` | `fail_fast` | **`0`** |
-| 用户中断 | `cancelled` | `interrupt` | `130` |
-| 运行级故障 | `failed` | — | `3` |
+| Everything processed (even if all `fail`) | `completed` | null | `0` |
+| Fail-fast stop | `cancelled` | `fail_fast` | **`0`** |
+| User interrupt | `cancelled` | `interrupt` | `130` |
+| Run-level fault | `failed` | — | `3` |
 
-**fail-fast 返回 0**：它是调用方显式请求的停止策略，命令做了它被要求做的事。
-结果不完整由 `status` 与 `counts.skipped` 表达，不由退出码表达。
-而且**只有 `evaluation.status=fail` 会触发它** —— 分数高低永不触发，因为 EvalExec
-不解释分数，无从判断 0 分算不算"坏"。
+**Fail-fast exits 0**: it is a stopping policy the caller explicitly requested,
+so the command did what it was told. Incompleteness is expressed by `status`
+and `counts.skipped`, not by the exit code. And **only
+`evaluation.status=fail` triggers it** — a low score never does, because
+EvalExec does not interpret scores and cannot judge whether a 0 is bad.
 
-**被取消的样本记 `skipped`，不是 `fail`。** 一个中途被放弃的样本从未完成，把它记成
-超时或内部错误，等于把"从未发生的工作"报成"做坏了的工作"。
+**Cancelled samples are `skipped`, not `fail`.** A sample abandoned mid-flight
+never finished; recording it as a timeout would report work that never happened
+as work done badly.
 
-中断的升级规则：第一次停止派发并走完补写与发布；第二次**忽略** —— 补写正是让部分结果
-可信的那一步；第三次放弃并**不发布**目录。因为发布是一次 `rename`，调用方永远不会看到
-半成品目录，只会看到"目录不存在"。
+Interrupt escalation: the first signal stops dispatch and completes the
+backfill and publication; the second is **ignored** — the backfill is precisely
+what makes a partial result trustworthy; the third abandons the run and
+publishes **nothing**, so a caller sees no directory rather than a half-built
+one.
 
-两条不保证的事：
+Two things deliberately not guaranteed:
 
-- **行序不保证。** 并发下记录按完成顺序写出。每行携带 `sequence`，消费方自行排序。
-- **`score.mean` 不保证跨并发度逐位一致。** 浮点加法不满足结合律，而记录到达顺序随
-  并发度变化。差异在 1e-15 量级；要逐位复现请用 `--concurrency 1`。
+- **Line order.** Under concurrency, records are written in completion order.
+  Every line carries `sequence`; consumers sort.
+- **Bit-identical `score.mean` across concurrency levels.** Float addition is
+  not associative and record arrival order varies with concurrency. The
+  difference is around 1e-15; use `--concurrency 1` to reproduce exactly.
 
-## 内置 Grader
+## Built-in Graders
 
-| `entry` | 比较方式 | 参数 |
+| `entry` | Comparison | Parameters |
 |---|---|---|
-| `exact_match` | `output` 与 `reference` 的期望值做 JSON 语义相等 | `reference_path`（默认 `$.expected_output`） |
-| `contains` | `output` 文本须包含**全部**期望子串 | `reference_path`（默认 `$.expected_contains`）、`case_sensitive` |
-| `regex` | `output` 文本匹配正则 | `pattern`（必填）、`case_sensitive` |
-| `json_schema` | `output` 通过 JSON Schema 校验 | `schema`（必填） |
-| `llm_judge` | 交由 LLM Judge 评判 | `rubric`（必填）、`min_score`、`max_score`、`use_reference`、`use_trajectory`、`structured_output` |
+| `exact_match` | JSON-semantic equality between `output` and the expected value in `reference` | `reference_path` (default `$.expected_output`) |
+| `contains` | `output` text contains **all** expected substrings | `reference_path` (default `$.expected_contains`), `case_sensitive` |
+| `regex` | `output` text matches a pattern | `pattern` (required), `case_sensitive` |
+| `json_schema` | `output` validates against a JSON Schema | `schema` (required) |
+| `llm_judge` | Delegated to an LLM Judge | `rubric` (required), `min_score`, `max_score`, `use_reference`, `use_trajectory`, `structured_output` |
 
-**「不匹配」是成功的评估，记 0 分**；只有「评不出来」（没有可比对的期望值、Judge 调用失败）才是
-`fail`，且 `fail` 不带分数、不计入均值。这条区分是整个状态模型的基础。
+**A mismatch is a successful evaluation scoring 0.** Only "could not conclude"
+(no expected value to compare against, a failed Judge call) is a `fail`, and a
+`fail` carries no score and does not enter the mean. This distinction is the
+foundation of the whole status model.
 
-`pattern` 与 `schema` 在**前置校验期**就编译一次：配置写错应当在跑第一个样本之前失败。
+`pattern` and `schema` are compiled once **during the pre-check phase**: a
+misconfiguration should fail before the first sample runs.
 
 ## LLM Judge
 
@@ -125,59 +195,66 @@ fail-fast 停止、用户中断都一样。这是"部分结果仍然可信"与"�
 }
 ```
 
-`protocol` 支持 `openai-chat` 与 `anthropic-messages`（`http-json` / `stdio-jsonl` 在 M6）。
-`parameters` 接受 10 个键：`model`（必填）、`temperature`、`max_completion_tokens`、
-`max_tokens`、`top_p`、`top_k`、`stop`、`reasoning_effort`、`parallel_tool_calls`、
-`response_format`。**未知键报参数错误**，不静默丢弃 —— 一个拼错的 `temperatur` 被悄悄忽略，
-会产出一份看起来正常、实际用错设置评出来的结果。
+`protocol` accepts `openai-chat`, `anthropic-messages`, `http-json` and
+`stdio-jsonl`. `parameters` accepts ten keys: `model` (required),
+`temperature`, `max_completion_tokens`, `max_tokens`, `top_p`, `top_k`, `stop`,
+`reasoning_effort`, `parallel_tool_calls`, `response_format`. **An unknown key
+is an argument error**, not a silent drop — a misspelled `temperatur` quietly
+ignored would produce a result that looks fine and was graded with the wrong
+settings.
 
-密钥只能由 `auth.env` 引用环境变量名。命令行传密钥的参数（`--api-key` 等）会被明确拒绝并
-提示改用 `auth.env`；配置文件里若出现疑似密钥，运行会被**拒绝**而不是脱敏 —— 悄悄抹掉会让
-你以为密钥被安全处理了，而它仍然写在磁盘上的那个文件里。
+Credentials may only be referenced by environment variable name via `auth.env`.
+Command-line flags that would carry a secret (`--api-key` and friends) are
+rejected with a pointer to `auth.env`. A configuration file that appears to
+contain a secret causes the run to be **refused** rather than redacted —
+silently scrubbing it would leave you believing the key was handled safely
+while it still sits in that file on disk.
 
-### 三点需要知道的限制
+Two limits worth knowing:
 
-- **`--seed` 不透传给 Judge。** aimodel v0.5.0 的 canonical 请求没有 `seed` 字段。
-  seed 只记入 `provenance`，`llm_judge` 靠 `temperature=0` 求稳。**不承诺评分逐字复现。**
-- **`structured_output` 默认关闭。** 结构化输出在 OpenAI 兼容端点之间不可移植 ——
-  DeepSeek 对 `json_schema` 请求直接返回 400。而 EvalExec 不重试，被拒的请求就是丢掉整个
-  样本。prompt 里约定 JSON + 容错解析在所有 provider 上都有效，所以它是默认路径；确认端点
-  支持时再开 `structured_output: true`。
-- **不重试。** 429 与 5xx 都计为 `judge_error`。需要重试请由上层重跑整个评估。
+- **`--seed` is not forwarded to the Judge.** The canonical chat request has no
+  `seed` field, so the seed is recorded in `provenance` only and `llm_judge`
+  relies on `temperature=0` for stability. **Bit-identical scores are not
+  promised.**
+- **`structured_output` is off by default.** It is not portable across
+  OpenAI-compatible endpoints — DeepSeek returns 400 for a `json_schema`
+  request — and since EvalExec does not retry, a rejected request loses the
+  whole sample. Agreeing on JSON in the prompt plus tolerant parsing works with
+  every provider, so that is the default path; turn it on once you have
+  confirmed your endpoint supports it.
 
-## 外部 Grader 与 Judge
+## External Graders and Judges
 
-Grader 与 Judge 都可以是别的语言写的进程或服务：
+Both can be processes or services written in another language. A Grader speaks
+`http-json` or `stdio-jsonl`; a Judge additionally speaks `openai-chat` and
+`anthropic-messages`. The wire specification — request and response shapes, and
+exactly which misbehaviour becomes which error code — is in
+[doc/protocol.md](./doc/protocol.md#external-protocols). The rule an
+implementation is most likely to get wrong: a `fail` carries `"score": null`,
+never `0`.
 
-| `protocol` | Grader | Judge |
-|---|---|---|
-| `builtin` | 内置或下游注册 | — |
-| `openai-chat` | — | Chat Completions 兼容端点 |
-| `anthropic-messages` | — | Anthropic Messages API |
-| `http-json` | POST 规范化 call，收 `Evaluation` | POST 简化请求，收单条回复 |
-| `stdio-jsonl` | 子进程一问一答，每行一个 JSON | 同左 |
+`stdio-jsonl` uses **one subprocess per worker (count = `--concurrency`)**: the
+protocol is one question at a time, and sharing a process would interleave
+conversations. After a timeout or crash the **process tree** is killed, not
+just the process — a script that forked its own children would otherwise leave
+orphans, and an orphan still holding the pipe is indistinguishable from a
+process that has not answered yet.
 
-协议规格与 5 个参考实现（Go × 4 + **Python** × 1）在 [`contract/`](./contract/)。
-Python 版不是示范代码，而是「协议不绑定语言」这条边界的**证据** —— 它与内置 Grader
-跑同一组 fixture 并产出一致判决，由 CI 保证。
+## Using it as a library
 
-`stdio-jsonl` 每个 worker 一个子进程（**子进程数 = `--concurrency`**）：协议是一问一答，
-共享进程会让对话交错。超时或崩溃后 kill **进程组**而非进程 —— 脚本自己 fork 的子进程
-否则会留下孤儿，而一个还握着管道的孤儿与"尚未应答的进程"无法区分。
-
-## 作为库使用
-
-`Run` 就是全部接口。它和命令行一样是一次原子调用，而不是让调用方自己去拼
-校验、读数据集、派发、汇总与写结果五个包：
+`Run` is the whole interface. Like the command line it is a single atomic call,
+rather than asking the caller to assemble validation, dataset reading,
+dispatch, summarizing and result writing:
 
 ```go
 result, err := evalexec.Run(ctx, request)
 ```
 
-三段可运行示例在 [`examples/consumer/`](./examples/consumer/)（**独立 module**）。
-README 引用它而不是复制 —— 复制的示例会腐烂。
+Three runnable examples live in [`examples/consumer/`](./examples/consumer/) (a
+**separate module**). This README links to them rather than copying them —
+copied examples rot.
 
-### 1. 跑一次评估
+### 1. Run one evaluation
 
 ```go
 req := &evalspec.EvalRequest{
@@ -197,9 +274,12 @@ req := &evalspec.EvalRequest{
 res, err := evalexec.Run(context.Background(), req)
 ```
 
-`eval_id` 缺省时由 `Run` 生成，所以不关心关联的调用方可以不填。
+`Run` generates an `eval_id` when one is not supplied, so a caller who does not
+care about correlation can leave it out. The functional options — registry,
+diagnostic writer, debug logs, clock — are tabulated in
+[doc/api.md](./doc/api.md#options).
 
-### 2. 注册自己的 Grader
+### 2. Register your own Grader
 
 ```go
 registry := grader.NewRegistry()
@@ -211,13 +291,13 @@ registry.Register("answer_length", func(spec evalspec.GraderSpec, _ grader.Deps)
 res, err := evalexec.Run(ctx, req, evalexec.WithGraderRegistry(registry))
 ```
 
-用 `protocol: "builtin"` + 自定义 `entry` 直接跑，不必走子进程。
-**`builtin` 不等于"内置的那五个"** —— 它指"编译进二进制里的 Grader"，包括下游注册的。
+Run it with `protocol: "builtin"` and your own `entry` — no subprocess needed.
+**`builtin` does not mean "one of the five that ship here"**; it means "a
+Grader compiled into the binary", downstream registrations included. This does
+not widen the `evalexec` binary, which registers only the five built-in
+entries: a custom entry is visible only in a binary you built yourself.
 
-这不扩大 `evalexec` 二进制的能力面：它只注册内置的五个 entry，自定义 entry 只在
-下游自己构建的二进制里可见。
-
-### 3. 用共享 fixtures 自测你的 Grader
+### 3. Self-test your Grader with the shared fixtures
 
 ```go
 data, _ := fixtures.Read(fixtures.CaseMixedSuccessFail, fixtures.FileDataset)
@@ -226,8 +306,8 @@ for _, line := range fixtures.Lines(data) {
     var session evalspec.Session
     json.Unmarshal([]byte(line), &session)
 
-    // 与宿主执行的是同一个检查，且关注的是"键是否存在"：
-    // 显式为 null 的字段算存在。
+    // The same check the host performs, and it asks whether the key is
+    // present: a field explicitly set to null counts as present.
     if missing := session.MissingFields(g.Declare().Requires); len(missing) > 0 {
         // ...
     }
@@ -237,53 +317,53 @@ for _, line := range fixtures.Lines(data) {
 }
 ```
 
-fixtures 就是为此发布的：EvalExec 用来自测的同一份数据，通过 `embed.FS` 取用，
-下游不必自己抄一份。
+The fixtures are published for exactly this: the same data EvalExec tests
+itself with, reachable through `embed.FS`, so downstream does not need its own
+copy.
 
-### `Run` 的几条承诺
+One promise worth stating here, because it shapes how you embed EvalExec:
+diagnostics default to `io.Discard`. A library must not assume it owns the host
+process's stderr; use `WithDiagnosticWriter` to direct them somewhere. The rest
+of what `Run` guarantees is in [doc/api.md](./doc/api.md#promises); what each
+version promises is in [doc/protocol.md](./doc/protocol.md#versioning).
 
-- 前置校验全部通过之前**不写任何东西**；被拒绝的运行不留目录，临时目录也不留。
-- 结果目录**一次出现或完全不出现**（发布是一次 `rename`）。
-- `records.jsonl` 每条数据集行恰好一行，**在每一条退出路径上**。
-- 失败的评估**永不记成 0 分**。
-- 诊断默认走 `io.Discard`：库不该假设自己拥有宿主进程的 stderr。用
-  `WithDiagnosticWriter` 显式指定。
-
-### 版本与兼容性
-
-| 协议版本 | Go 模块版本 | 承诺 |
-|---|---|---|
-| `evalexec/v1alpha1` | `v0.x` | 协议内只增可选字段；Go API 按 §稳定性分层，L3/L4 可变 |
-| `evalexec/v1alpha1` | `v1.x` | Go API 遵守兼容性承诺；`gorelease` 从 advisory 转硬失败 |
-
-删字段、改类型或改状态含义 = 提协议版本 + 提 major。
-
-## 开发
+## Development
 
 ```bash
-make build      # 构建 bin/evalexec（版本经 -ldflags 注入）
+make build      # build bin/evalexec (version injected via -ldflags)
 make test       # go test -race ./...
-make lint       # 词根守卫 + 库路径边界守卫 + 依赖面守卫 + golangci-lint
-make test-e2e   # 真实模型端到端；需 OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_MODEL
+make lint       # terminology, library-boundary and dependency guards + golangci-lint
+make test-e2e   # against a real model; needs OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_MODEL
 ```
 
-`make lint` 包含 `lint-secrets`：它跑出一个真实结果目录并扫描全部文件（含 `logs/`），
-断言不含哨兵密钥、不含任何密钥形态、`Authorization` 已被替换 —— 并另跑一个测试验证
-**扫描器确实会触发**。一个从未报过警的泄漏检测器，和一个失效的检测器无法区分。
+`make lint` includes `lint-secrets`: it produces a real result directory and
+scans every file in it, `logs/` included, asserting that no sentinel secret, no
+secret-shaped string and no live `Authorization` header survives — and it
+separately verifies that **the scanner does fire**. A leak detector that has
+never reported anything is indistinguishable from a broken one.
 
-三条守卫是硬约束，不是建议：
+Three guards are hard constraints, not suggestions:
 
-- `lint-terms` —— 评分组件一律称 **Grader**；同义的近似词根一律禁止（具体词表见 `Makefile` 的 `lint-terms`）。公开 API 上写错词根，改名就是破坏性变更。
-- `lint-boundary` —— `cmd/` 之外禁止 `os.Exit` / `signal.Notify` / `os.Stderr`。evalexec 会被当作库嵌入宿主进程，这三者分别意味着杀进程、抢信号、污染输出。
-- `check-deps` —— 直接依赖控制在 aimodel + 一个 JSON Schema 库以内。
+- `lint-terms` — the scoring component is always called **Grader**; synonymous
+  word roots are banned (the list is in the `Makefile`). Getting the word root
+  wrong on a public API makes renaming it a breaking change.
+- `lint-boundary` — no `os.Exit` / `signal.Notify` / `os.Stderr` outside
+  `cmd/`. EvalExec is embedded in host processes, where those three mean
+  killing the process, stealing its signals, and polluting its output.
+- `check-deps` — direct dependencies capped at aimodel plus one JSON Schema
+  library.
 
-## 文档
+## Documentation
 
-| 文档 | 内容 |
-|---|---|
-| [doc/dev-plan.md](./doc/dev-plan.md) | 分阶段开发规划、技术选型、验收标准映射 |
-| [doc/design/](./doc/design/) | 各里程碑的阶段设计与验证报告 |
-| [contract/README.md](./contract/README.md) | **外部 Grader / Judge 的协议契约**，含 5 个参考实现 |
+This README is the explanation; `doc/` is the reference, one document per kind
+of reader, and does not repeat what is here.
+
+| Document | For | Contents |
+|---|---|---|
+| [doc/protocol.md](./doc/protocol.md) | Anyone producing or consuming these documents, in any language | Every document field by field, then the external Grader / Judge wire specification and the versioning promise |
+| [doc/api.md](./doc/api.md) | CLI users and Go integrators | Every flag and exit code; the library surface, options and return contract |
+| [doc/architecture.md](./doc/architecture.md) | Anyone changing this repository | Stability layers, package map, run flow, backfill |
+| [AGENTS.md](./AGENTS.md) | Agents working in this repository | Conventions |
 
 ## License
 

@@ -12,14 +12,14 @@ LDFLAGS := -s -w \
 	-X '$(MODULE)/version.Commit=$(COMMIT)' \
 	-X '$(MODULE)/version.Date=$(DATE)'
 
-# Direct non-stdlib dependencies allowed in go.mod. dev-plan §1.5 caps this at
-# aimodel plus one JSON Schema library, and that budget is now spent.
+# Direct non-stdlib dependencies allowed in go.mod: aimodel plus one JSON
+# Schema library, and that budget is now spent.
 ALLOWED_DEPS := github.com/vogo/aimodel github.com/santhosh-tekuri/jsonschema/v6
 
-.PHONY: all build test test-e2e test-protocol test-consumer lint lint-terms lint-boundary \
+.PHONY: all build test test-e2e test-consumer lint lint-terms lint-boundary \
 	lint-secrets check-deps apidiff fmt tidy clean
 
-all: build test test-protocol test-consumer lint
+all: build test test-consumer lint
 
 build:
 	@mkdir -p bin
@@ -37,13 +37,6 @@ test:
 test-e2e:
 	go test -tags e2e -count=1 -v ./e2e/...
 
-# Acceptance criterion 21: the protocol must be checkable without Go. The
-# self-test runs first, because a checker that cannot fail proves nothing about
-# the fixtures it just accepted.
-test-protocol:
-	python3 contract/verify_fixtures.py --self-test
-	python3 contract/verify_fixtures.py fixtures/data
-
 # The downstream smoke test. Its own module, because an examples/ directory
 # inside this one would only prove the code compiles — not that everything a
 # downstream program needs is exported.
@@ -60,7 +53,7 @@ lint: lint-terms lint-boundary check-deps lint-secrets
 		echo "lint: golangci-lint not installed, skipping"; \
 	fi
 
-# dev-plan §1.5 terminology boundary: the scoring component is always a
+# Terminology boundary: the scoring component is always a
 # "Grader". The word root "evaluator" must not appear in code, fixtures or
 # user-facing docs, because getting it wrong on a public API makes the rename
 # a breaking change.
@@ -77,15 +70,15 @@ lint-terms:
 	fi; \
 	echo "lint-terms: ok"
 
-# dev-plan §1.5 / §7: evalexec ships as a library too, so *library* code that
+# evalexec ships as a library too, so *library* code that
 # exits the process, grabs signals, or writes to os.Stderr would misbehave
 # inside a host process.
 #
 # Standalone programs are exempt, because that is precisely where these belong:
-# cmd/ is the binary, contract/ holds the reference external components, and
-# examples/ holds the downstream smoke test — the last two are separate
-# processes, and examples/consumer is a separate module besides. Test files are
-# exempt too (M5 drives a real subprocess to exercise SIGINT).
+# cmd/ is the binary, testdata/ holds the stdio helper programs the
+# interoperability tests fork, and examples/ holds the downstream smoke test —
+# all separate processes, and examples/consumer is a separate module besides.
+# Test files are exempt too: some drive a real subprocess to exercise SIGINT.
 #
 # This is the cheap pre-check, available without golangci-lint. The
 # authoritative check is the forbidigo linter in .golangci.yml, which works on
@@ -95,7 +88,7 @@ lint-terms:
 # line-based, so a `//` inside a string literal truncates the rest of that
 # line; forbidigo is what closes that gap.
 lint-boundary:
-	@files=$$(git ls-files --cached --others --exclude-standard '*.go' | grep -vE '^cmd/|^contract/|^examples/' | grep -v '_test\.go$$' | while read -r f; do [ -f "$$f" ] && echo "$$f"; done); \
+	@files=$$(git ls-files --cached --others --exclude-standard '*.go' | grep -vE '^cmd/|^testdata/|^examples/' | grep -v '_test\.go$$' | while read -r f; do [ -f "$$f" ] && echo "$$f"; done); \
 	if [ -z "$$files" ]; then echo "lint-boundary: ok (no files)"; exit 0; fi; \
 	hits=$$(for f in $$files; do \
 		sed 's|//.*||' "$$f" | grep -nE 'os\.Exit|signal\.Notify|os\.Stderr' | sed "s|^|$$f:|"; \
@@ -107,7 +100,7 @@ lint-boundary:
 	fi; \
 	echo "lint-boundary: ok"
 
-# dev-plan §1.5: assert no secret ever reaches a result directory.
+# Assert no secret ever reaches a result directory.
 #
 # It runs as a Go test rather than a shell script because it has to produce a
 # result directory first — the scan is over real output, not over the sources.
@@ -127,8 +120,8 @@ check-deps:
 	done; \
 	echo "check-deps: ok ($$(echo $$deps | wc -w | tr -d ' ') direct dependencies)"
 
-# API compatibility report against the previous tag. Warning-only during v0
-# (dev-plan §1.3); becomes a hard failure at v1.0.
+# API compatibility report against the previous tag. Warning-only during v0;
+# becomes a hard failure at v1.0.
 apidiff:
 	@go run golang.org/x/exp/cmd/gorelease@latest || \
 		echo "apidiff: gorelease unavailable or reported changes (advisory during v0)"

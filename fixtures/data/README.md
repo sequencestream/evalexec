@@ -1,9 +1,8 @@
 # Protocol fixtures
 
 Shared cases every EvalExec implementation must satisfy. They live outside
-`testdata/` on purpose: acceptance criterion 21 requires a Python
-implementation and a Go one to agree on the same data, so it has to be
-reachable without a Go toolchain.
+`testdata/` on purpose: a Python implementation and a Go one must agree on the
+same data, so it has to be reachable without a Go toolchain.
 
 | Case | Shape | Pins |
 |---|---|---|

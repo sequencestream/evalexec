@@ -212,7 +212,7 @@ func (s *Session) UnmarshalJSON(data []byte) error {
 	s.fields = make(map[SessionField]json.RawMessage, len(allSessionFields))
 
 	// Unrecognized keys are ignored rather than rejected: forward
-	// compatibility depends on it (02-core-spec.md §1).
+	// compatibility depends on it.
 	for _, f := range allSessionFields {
 		v, present := raw[string(f)]
 		if !present {

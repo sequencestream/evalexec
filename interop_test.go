@@ -18,16 +18,15 @@ import (
 )
 
 // Interoperability is the one place the "protocol over SDK" boundary can be
-// demonstrated rather than merely stated. Everything up to here has been Go;
-// these tests run the same fixtures through a remote service, a Go subprocess
-// and a Python subprocess, and require the results to agree.
+// demonstrated rather than merely stated. Everything up to here has been an
+// in-process call; these tests run the same fixtures through a remote service
+// and through a subprocess, and require the results to agree.
 
-// verdict is the part of an evaluation that has to match across
-// implementations.
+// verdict is the part of an evaluation that has to match across transports.
 //
-// reason and evidence are excluded on purpose. The reference implementations
-// were written independently, and different wording is not incompatibility —
-// requiring identical prose would test the phrasing rather than the protocol.
+// reason and evidence are excluded on purpose: different wording is not
+// incompatibility, and requiring identical prose would test the phrasing rather
+// than the protocol.
 type verdictSummary struct {
 	caseID string
 	status string
@@ -77,10 +76,10 @@ func assertSameVerdicts(t *testing.T, wantName string, want []verdictSummary, go
 	}
 }
 
-// referenceGraderServer starts the reference http-json Grader in-process.
+// referenceGraderServer starts an http-json Grader in-process.
 //
-// It runs the same code as contract/grader-http, imported rather than compiled
-// and forked, so a test failure points at the protocol rather than at a build.
+// It applies the same rule as the built-in exact_match Grader and as the stdio
+// subprocess under testdata/, so a verdict difference points at the transport.
 func referenceGraderServer(t *testing.T, status int) *httptest.Server {
 	t.Helper()
 
@@ -108,7 +107,7 @@ func referenceGraderServer(t *testing.T, status int) *httptest.Server {
 	return srv
 }
 
-// referenceGrade mirrors the reference implementations' rule.
+// referenceGrade mirrors the rule the other implementations apply.
 func referenceGrade(call evalspec.GradeCall) map[string]any {
 	expected, found := expectedOutputOf(call.Reference)
 	if !found {
@@ -169,23 +168,23 @@ func expectedOutputOf(reference json.RawMessage) (any, bool) {
 	return v, true
 }
 
-// buildReference compiles one of the reference implementations.
+// buildHelper compiles one of the stdio test programs under testdata/.
 var (
-	referenceOnce  sync.Map
-	referenceMutex sync.Mutex
+	helperOnce  sync.Map
+	helperMutex sync.Mutex
 )
 
-func buildReference(t *testing.T, pkg string) string {
+func buildHelper(t *testing.T, pkg string) string {
 	t.Helper()
 
-	referenceMutex.Lock()
-	defer referenceMutex.Unlock()
+	helperMutex.Lock()
+	defer helperMutex.Unlock()
 
-	if cached, ok := referenceOnce.Load(pkg); ok {
+	if cached, ok := helperOnce.Load(pkg); ok {
 		return cached.(string)
 	}
 
-	dir, err := os.MkdirTemp("", "evalexec-contract-")
+	dir, err := os.MkdirTemp("", "evalexec-stdio-")
 	if err != nil {
 		t.Fatalf("temp dir: %v", err)
 	}
@@ -197,14 +196,14 @@ func buildReference(t *testing.T, pkg string) string {
 		t.Fatalf("build %s: %v\n%s", pkg, err, out)
 	}
 
-	referenceOnce.Store(pkg, bin)
+	helperOnce.Store(pkg, bin)
 
 	return bin
 }
 
-// TestBuiltinAndExternalGradersAgree is the M6 acceptance check: the same
-// fixture graded through the built-in Grader, a remote service, a Go subprocess
-// and a Python subprocess must reach the same verdicts.
+// TestBuiltinAndExternalGradersAgree is the cross-transport check: the same
+// fixture graded through the built-in Grader, a remote service and a subprocess
+// must reach the same verdicts.
 func TestBuiltinAndExternalGradersAgree(t *testing.T) {
 	for _, caseName := range []string{fixtures.CaseExactMatchAllPass, fixtures.CaseMixedSuccessFail} {
 		t.Run(caseName, func(t *testing.T) {
@@ -219,48 +218,16 @@ func TestBuiltinAndExternalGradersAgree(t *testing.T) {
 
 			assertSameVerdicts(t, "builtin", builtin, "http-json", overHTTP)
 
-			goBinary := buildReference(t, "contract/grader-stdio")
+			stdioBinary := buildHelper(t, "testdata/graderstdio")
 
 			overStdio := runWithGrader(t, caseName, func(req *evalspec.EvalRequest) {
 				req.Grader.Protocol = evalspec.GraderStdioJSONL
-				req.Grader.Entry = goBinary
+				req.Grader.Entry = stdioBinary
 			})
 
-			assertSameVerdicts(t, "builtin", builtin, "stdio-jsonl (Go)", overStdio)
-
-			// The claim that the protocol is not bound to Go, tested rather than
-			// asserted.
-			python := pythonGrader(t)
-
-			overPython := runWithGrader(t, caseName, func(req *evalspec.EvalRequest) {
-				req.Grader.Protocol = evalspec.GraderStdioJSONL
-				req.Grader.Entry = python
-			})
-
-			assertSameVerdicts(t, "builtin", builtin, "stdio-jsonl (Python)", overPython)
+			assertSameVerdicts(t, "builtin", builtin, "stdio-jsonl", overStdio)
 		})
 	}
-}
-
-// pythonGrader returns the path to the Python reference Grader, skipping when
-// no interpreter is available.
-func pythonGrader(t *testing.T) string {
-	t.Helper()
-
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 is not available; the cross-language check needs it")
-	}
-
-	abs, err := filepath.Abs("contract/grader-stdio.py")
-	if err != nil {
-		t.Fatalf("abs path: %v", err)
-	}
-
-	if err := os.Chmod(abs, 0o755); err != nil {
-		t.Fatalf("chmod: %v", err)
-	}
-
-	return abs
 }
 
 // runWithGrader stages a fixture, applies a Grader override and returns the
@@ -515,8 +482,8 @@ func TestStdioGraderIsNotExecutable(t *testing.T) {
 	}
 }
 
-// judgeVerdict is the reference Judge rule, duplicated here so the test does
-// not import a main package.
+// judgeVerdict is the Judge rule all three transports answer with, duplicated
+// here so the test does not import the testdata program.
 func judgeVerdict(prompt string) string {
 	trajectory := promptSection(prompt, "trajectory")
 
@@ -549,7 +516,7 @@ func promptSection(prompt, name string) string {
 	return strings.TrimSpace(prompt[start : start+end])
 }
 
-// TestJudgeProtocolsAgree is the other half of the M6 acceptance check: the same
+// TestJudgeProtocolsAgree is the other half of that check: the same
 // fixture judged over the OpenAI-compatible protocol and over EvalExec's own
 // http-json and stdio-jsonl protocols must reach the same verdicts.
 //
@@ -627,7 +594,7 @@ func TestJudgeProtocolsAgree(t *testing.T) {
 
 	assertSameVerdicts(t, "openai-chat", overOpenAI, "http-json", overHTTPJSON)
 
-	stdioBinary := buildReference(t, "contract/judge-stdio")
+	stdioBinary := buildHelper(t, "testdata/judgestdio")
 	overStdio := runWithJudge(t, evalspec.JudgeStdioJSONL, stdioBinary)
 
 	assertSameVerdicts(t, "openai-chat", overOpenAI, "stdio-jsonl", overStdio)

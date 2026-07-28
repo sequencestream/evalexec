@@ -34,3 +34,5 @@ go.work.sum
 # Build output
 bin/
 examples/consumer/evalexec-consumer
+
+grader-http

@@ -93,7 +93,7 @@ func readResult(t *testing.T, dir string) (map[string]any, []map[string]any) {
 	return res, records
 }
 
-// TestGoldenCasesEndToEnd is the M3 acceptance check: the rule-Grader fixtures
+// TestGoldenCasesEndToEnd is the golden-file check: the rule-Grader fixtures
 // must reproduce their golden results exactly, once the values that
 // legitimately vary between runs are normalized away.
 func TestGoldenCasesEndToEnd(t *testing.T) {
@@ -250,7 +250,8 @@ func TestEmptyDatasetProducesAnEmptyResult(t *testing.T) {
 	}
 }
 
-// TestTwoRunsAreIndependent covers acceptance criterion 20.
+// TestTwoRunsAreIndependent checks that two runs over the same inputs share no
+// state: neither result may be influenced by the other having happened.
 func TestTwoRunsAreIndependent(t *testing.T) {
 	root := t.TempDir()
 
@@ -604,8 +605,8 @@ func (badShapeGrader) Grade(context.Context, evalspec.GradeCall) (evalspec.Evalu
 	}, nil
 }
 
-// TestOutputDirectoryIsNotOverwritten covers acceptance criterion 19 through
-// the library entry point.
+// TestOutputDirectoryIsNotOverwritten checks the refusal to write over an
+// existing result through the library entry point.
 func TestOutputDirectoryIsNotOverwritten(t *testing.T) {
 	root := t.TempDir()
 

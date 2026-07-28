@@ -95,7 +95,7 @@ func TestRequestsParseAndValidate(t *testing.T) {
 	}
 }
 
-// TestDatasetsRoundTrip is the M1 acceptance check: every dataset row must
+// TestDatasetsRoundTrip is the protocol round-trip check: every dataset row must
 // parse into a Session and marshal back to something semantically equal —
 // above all preserving which keys were present.
 func TestDatasetsRoundTrip(t *testing.T) {
