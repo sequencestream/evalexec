@@ -25,7 +25,7 @@ import (
 
 	"github.com/vogo/aimodel/ais"
 
-	"github.com/sequencestream/evalexec/judge/provider/httpjson"
+	"github.com/sequencestream/evalexec/internal/judge/provider/httpjson"
 	"github.com/sequencestream/evalexec/internal/subprocess"
 )
 

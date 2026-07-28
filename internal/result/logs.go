@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/sequencestream/evalexec/judge/transport"
+	"github.com/sequencestream/evalexec/internal/judge/transport"
 )
 
 // LogWriter writes the raw Judge exchanges of individual samples into logs/.

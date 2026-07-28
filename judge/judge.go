@@ -31,9 +31,9 @@ import (
 	"github.com/vogo/aimodel/provider/openai"
 
 	"github.com/sequencestream/evalexec/evalspec"
-	"github.com/sequencestream/evalexec/judge/provider/httpjson"
-	"github.com/sequencestream/evalexec/judge/provider/stdiojsonl"
-	"github.com/sequencestream/evalexec/judge/transport"
+	"github.com/sequencestream/evalexec/internal/judge/provider/httpjson"
+	"github.com/sequencestream/evalexec/internal/judge/provider/stdiojsonl"
+	"github.com/sequencestream/evalexec/internal/judge/transport"
 )
 
 // Prompt is one question for the Judge.

@@ -13,7 +13,7 @@ import (
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/fixtures"
-	"github.com/sequencestream/evalexec/result"
+	"github.com/sequencestream/evalexec/internal/result"
 )
 
 // Interrupt handling can only be tested through a real process: the signal

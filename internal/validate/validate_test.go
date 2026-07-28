@@ -10,7 +10,7 @@ import (
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/validate"
+	"github.com/sequencestream/evalexec/internal/validate"
 )
 
 // fixture builds a valid request against real files, which each test then

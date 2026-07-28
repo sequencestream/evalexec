@@ -44,15 +44,15 @@ import (
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	_ "github.com/sequencestream/evalexec/grader/builtin" // register the built-in Graders
-	"github.com/sequencestream/evalexec/grader/external"
+	_ "github.com/sequencestream/evalexec/internal/grader/builtin" // register the built-in Graders
+	"github.com/sequencestream/evalexec/internal/grader/external"
 	"github.com/sequencestream/evalexec/judge"
-	"github.com/sequencestream/evalexec/judge/transport"
+	"github.com/sequencestream/evalexec/internal/judge/transport"
 	"github.com/sequencestream/evalexec/internal/redact"
-	"github.com/sequencestream/evalexec/result"
-	"github.com/sequencestream/evalexec/runner"
+	"github.com/sequencestream/evalexec/internal/result"
+	"github.com/sequencestream/evalexec/internal/runner"
 	"github.com/sequencestream/evalexec/internal/summary"
-	"github.com/sequencestream/evalexec/validate"
+	"github.com/sequencestream/evalexec/internal/validate"
 	"github.com/sequencestream/evalexec/internal/version"
 )
 

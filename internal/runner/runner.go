@@ -28,7 +28,7 @@ import (
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/judge/transport"
+	"github.com/sequencestream/evalexec/internal/judge/transport"
 	"github.com/sequencestream/evalexec/internal/summary"
 )
 

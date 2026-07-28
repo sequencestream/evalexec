@@ -7,7 +7,7 @@ import (
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	_ "github.com/sequencestream/evalexec/grader/builtin"
+	_ "github.com/sequencestream/evalexec/internal/grader/builtin"
 )
 
 // build constructs a built-in Grader from its entry name and parameters.

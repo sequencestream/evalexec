@@ -11,7 +11,7 @@ import (
 	evalexec "github.com/sequencestream/evalexec"
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/internal/redact"
-	"github.com/sequencestream/evalexec/result"
+	"github.com/sequencestream/evalexec/internal/result"
 )
 
 // faithfulnessRows is a dataset built so the right answers are unambiguous.

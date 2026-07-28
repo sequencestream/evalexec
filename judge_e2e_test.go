@@ -15,10 +15,10 @@ import (
 	"github.com/sequencestream/evalexec/evalspec/evalspectest"
 	"github.com/sequencestream/evalexec/fixtures"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/grader/builtin"
+	"github.com/sequencestream/evalexec/internal/grader/builtin"
 	"github.com/sequencestream/evalexec/judge"
 	"github.com/sequencestream/evalexec/internal/redact"
-	"github.com/sequencestream/evalexec/result"
+	"github.com/sequencestream/evalexec/internal/result"
 )
 
 // recordedJudge replays the Judge replies captured in a fixture, so the

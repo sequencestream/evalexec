@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sequencestream/evalexec/result"
+	"github.com/sequencestream/evalexec/internal/result"
 )
 
 func TestPublishIsAtomic(t *testing.T) {
