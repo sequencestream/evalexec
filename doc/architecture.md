@@ -12,35 +12,39 @@ does things.
 
 ## Stability layers
 
-Because every package is on the public API surface, stability is declared in
-layers rather than enforced by the compiler:
+Only what downstream code can import is on the public API surface; everything
+else lives under `internal/` and the compiler enforces the boundary:
 
 | Layer | Packages | Promise |
 |---|---|---|
 | **L1 protocol** | `evalspec`, `fixtures` | Lives with `spec_version`; within `evalexec/v1alpha1` only optional fields are added |
-| **L2 extension** | root `Run`, `grader`, `judge` | Go compatibility promise from v1.0; interfaces kept deliberately narrow |
-| **L3 components** | `dataset`, `validate`, `runner`, `summary`, `result`, `exitcode`, `redact`, `version` | May change during v0 |
-| **L4 internals** | `cli` | **No compatibility promise**; not for downstream use |
+| **L2 Go API** | root `Run`, `grader`, `judge`, `evalerr` | Go compatibility promise from v1.0; interfaces kept deliberately narrow |
 
-`CHANGELOG.md` records changes to L3; an L1 change bumps `spec_version` as well.
+An L1 change bumps `spec_version` as well.
 
 ## Package map
 
+Public packages carry the concepts; `internal/` carries the machinery.
+
 ```
-cmd/evalexec  →  cli  →  evalexec.Run
-                            ├── validate    six pre-checks, writes nothing
-                            ├── redact      request snapshot + sha256
-                            ├── grader      registry, builtin/, external/
-                            ├── judge       transports, provider/
-                            ├── dataset     JSONL reader, case_id index
-                            ├── runner      dispatch, timeout, stop, backfill
-                            ├── summary     counts, score stats, run status
-                            ├── result      temp dir, publish, logs, checksums
-                            └── exitcode    the only place codes are decided
+cmd/evalexec  →  internal/cli  →  evalexec.Run
+                                     ├── internal/validate    six pre-checks, writes nothing
+                                     ├── internal/redact      request snapshot + sha256
+                                     ├── grader               interface, registry, declarations
+                                     │     ├── internal/grader/builtin     the five built-in Graders
+                                     │     └── internal/grader/external    http-json, stdio-jsonl
+                                     ├── judge                interface, checker
+                                     │     ├── internal/judge/provider     openai-chat, anthropic-messages, …
+                                     │     └── internal/judge/transport    HTTP recorder
+                                     ├── internal/dataset     JSONL reader, case_id index
+                                     ├── internal/runner      dispatch, timeout, stop, backfill
+                                     ├── internal/summary     counts, score stats, run status
+                                     ├── internal/result      temp dir, publish, logs, checksums
+                                     └── internal/exitcode    the only place codes are decided
 ```
 
-`evalerr` classifies failures; `exitcode` is the single place that maps a
-failure to a process exit code, so the mapping cannot drift.
+`evalerr` classifies failures; `internal/exitcode` is the single place that maps
+a failure to a process exit code, so the mapping cannot drift.
 
 ## Run flow
 

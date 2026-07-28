@@ -10,7 +10,7 @@ import (
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/fixtures"
-	"github.com/sequencestream/evalexec/result"
+	"github.com/sequencestream/evalexec/internal/result"
 )
 
 // materialize copies one pre-check subcase out of the embedded fixtures into a

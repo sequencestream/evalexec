@@ -16,7 +16,7 @@ import (
 	"github.com/sequencestream/evalexec/evalspec/evalspectest"
 	"github.com/sequencestream/evalexec/fixtures"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/result"
+	"github.com/sequencestream/evalexec/internal/result"
 )
 
 // TestFailFastCaseEndToEnd runs f04 and compares against the golden files.

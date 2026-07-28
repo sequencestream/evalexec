@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sequencestream/evalexec/version"
+	"github.com/sequencestream/evalexec/internal/version"
 )
 
 func TestRunVersion(t *testing.T) {
@@ -77,9 +77,9 @@ func TestLdflagsStampReachesBinary(t *testing.T) {
 
 	bin := filepath.Join(t.TempDir(), "evalexec")
 	ldflags := strings.Join([]string{
-		"-X github.com/sequencestream/evalexec/version.Version=" + wantVersion,
-		"-X github.com/sequencestream/evalexec/version.Commit=" + wantCommit,
-		"-X github.com/sequencestream/evalexec/version.Date=" + wantDate,
+		"-X github.com/sequencestream/evalexec/internal/version.Version=" + wantVersion,
+		"-X github.com/sequencestream/evalexec/internal/version.Commit=" + wantCommit,
+		"-X github.com/sequencestream/evalexec/internal/version.Date=" + wantDate,
 	}, " ")
 
 	build := exec.CommandContext(t.Context(), "go", "build", "-ldflags", ldflags, "-o", bin, ".")

@@ -118,10 +118,10 @@ Every field of every document is specified in
 
 ## Stability layers
 
-The project deliberately does not use `internal/`, so every package sits on the
-public API surface. Stability is therefore declared in four layers — the
-protocol types are the most stable, `cli` promises nothing. Which package sits
-where is tabulated in
+The public surface is deliberately small — everything else lives under
+`internal/` and is enforced by the compiler. What remains is declared in two
+layers: the protocol types are the most stable, the Go API follows from v1.0.
+Which package sits where is tabulated in
 [doc/architecture.md](./doc/architecture.md#stability-layers).
 
 ## Concurrency and stopping

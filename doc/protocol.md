@@ -343,7 +343,7 @@ neither is a `protocol_error`. `score` is recorded verbatim — `min_score` /
 
 | Protocol version | Go module | Promise |
 |---|---|---|
-| `evalexec/v1alpha1` | `v0.x` | The protocol only gains optional fields; the Go API follows the stability layers, L3/L4 may change |
+| `evalexec/v1alpha1` | `v0.x` | The protocol only gains optional fields; the Go API may change during v0 |
 | `evalexec/v1alpha1` | `v1.x` | The Go API follows the Go compatibility promise; `gorelease` turns from advisory into a hard failure |
 
 Removing a field, changing a type, or changing what a status means = a new

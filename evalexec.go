@@ -44,17 +44,16 @@ import (
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	_ "github.com/sequencestream/evalexec/grader/builtin" // register the built-in Graders
-	"github.com/sequencestream/evalexec/grader/declaration"
-	"github.com/sequencestream/evalexec/grader/external"
+	_ "github.com/sequencestream/evalexec/internal/grader/builtin" // register the built-in Graders
+	"github.com/sequencestream/evalexec/internal/grader/external"
+	"github.com/sequencestream/evalexec/internal/judge/transport"
+	"github.com/sequencestream/evalexec/internal/redact"
+	"github.com/sequencestream/evalexec/internal/result"
+	"github.com/sequencestream/evalexec/internal/runner"
+	"github.com/sequencestream/evalexec/internal/summary"
+	"github.com/sequencestream/evalexec/internal/validate"
+	"github.com/sequencestream/evalexec/internal/version"
 	"github.com/sequencestream/evalexec/judge"
-	"github.com/sequencestream/evalexec/judge/transport"
-	"github.com/sequencestream/evalexec/redact"
-	"github.com/sequencestream/evalexec/result"
-	"github.com/sequencestream/evalexec/runner"
-	"github.com/sequencestream/evalexec/summary"
-	"github.com/sequencestream/evalexec/validate"
-	"github.com/sequencestream/evalexec/version"
 )
 
 // StepRun is the step name reported for run-level faults.
@@ -63,6 +62,13 @@ const StepRun = "run"
 // Clock supplies the current time.
 type Clock interface {
 	Now() time.Time
+}
+
+// JudgeChecker validates a Judge configuration by whatever means the transport
+// requires — typically by constructing the client, so that an unusable
+// endpoint fails during the pre-check rather than on the first call.
+type JudgeChecker interface {
+	Check(spec *evalspec.JudgeModelSpec) error
 }
 
 type systemClock struct{}
@@ -75,7 +81,7 @@ type config struct {
 	clock     Clock
 	ids       IDGenerator
 	diag      io.Writer
-	judge     validate.JudgeChecker
+	judge     JudgeChecker
 	debugLogs bool
 }
 
@@ -134,12 +140,12 @@ func WithDebugLogs() Option {
 // WithJudgeChecker replaces the transport-level Judge pre-check. The default
 // constructs the real client, so an unusable endpoint fails before the first
 // call rather than on it.
-func WithJudgeChecker(j validate.JudgeChecker) Option {
+func WithJudgeChecker(j JudgeChecker) Option {
 	return func(c *config) { c.judge = j }
 }
 
 // judgeChecker returns the pre-check to use for this request.
-func (c *config) judgeChecker(req *evalspec.EvalRequest) validate.JudgeChecker {
+func (c *config) judgeChecker(req *evalspec.EvalRequest) JudgeChecker {
 	if c.judge != nil {
 		return c.judge
 	}
@@ -175,21 +181,21 @@ type graderResolver struct {
 	registry *grader.Registry
 }
 
-func (r *graderResolver) Resolve(spec evalspec.GraderSpec) (declaration.Declaration, error) {
+func (r *graderResolver) Resolve(spec evalspec.GraderSpec) (grader.Declaration, error) {
 	// An external Grader's declaration comes from its configuration; there is
 	// nothing to ask, and asking would mean contacting the process the
 	// pre-check exists to validate before contacting.
 	if spec.Protocol != evalspec.GraderBuiltin {
-		return declaration.Declaration{}, validate.ErrUnknownEntry
+		return grader.Declaration{}, validate.ErrUnknownEntry
 	}
 
 	decl, err := r.registry.Resolve(spec, grader.Deps{})
 	if err != nil {
 		if errors.Is(err, grader.ErrUnknownEntry) {
-			return declaration.Declaration{}, fmt.Errorf("%w: %q", validate.ErrUnknownEntry, spec.Entry)
+			return grader.Declaration{}, fmt.Errorf("%w: %q", validate.ErrUnknownEntry, spec.Entry)
 		}
 
-		return declaration.Declaration{}, err
+		return grader.Declaration{}, err
 	}
 
 	return decl, nil
