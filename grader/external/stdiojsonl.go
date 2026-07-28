@@ -9,7 +9,6 @@ import (
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/grader/declaration"
 	"github.com/sequencestream/evalexec/subprocess"
 )
 
@@ -51,7 +50,7 @@ func NewStdioJSONL(spec evalspec.GraderSpec, _ int) (grader.Grader, error) {
 
 // Declare reports what the configuration says this Grader needs.
 func (g *StdioJSONL) Declare() grader.Declaration {
-	return declaration.Declaration{
+	return grader.Declaration{
 		Entry:         g.command,
 		Requires:      g.requires,
 		RequiresJudge: g.spec.RequiresJudge,

@@ -1,21 +1,17 @@
-// Package declaration holds what each built-in Grader requires of a session.
-//
-// It is a package of its own, below both validate and grader, because the
-// pre-check phase must know a Grader's requirements before any Grader is
-// constructed. Putting the table in the grader package would make validation
-// depend on the implementations it exists to validate.
+// This file holds what each built-in Grader requires of a session. The table
+// lives here, next to the interface rather than with the implementations, so
+// the pre-check phase can know a Grader's requirements before any Grader is
+// constructed.
 //
 // For a built-in Grader the declaration is authoritative and the configuration
 // file merely restates it: a mismatch is a configuration error. The Grader's
 // own code decides what it needs to do its job, and a file claiming otherwise
 // is wrong rather than persuasive.
 //
-// # Stability
-//
-// L3 component. Changeable during v0; from v1.0 it follows the Go
-// compatibility promise. The declarations themselves are part of the
-// specification and change only with it.
-package declaration
+// The declarations themselves are part of the specification and change only
+// with it.
+
+package grader
 
 import (
 	"fmt"
@@ -114,15 +110,15 @@ var builtins = map[string]Declaration{
 	},
 }
 
-// Lookup returns the declaration for a built-in entry.
-func Lookup(entry string) (Declaration, bool) {
+// LookupDeclaration returns the declaration for a built-in entry.
+func LookupDeclaration(entry string) (Declaration, bool) {
 	d, ok := builtins[entry]
 
 	return d, ok
 }
 
-// Entries returns the known built-in entry names, sorted.
-func Entries() []string {
+// DeclaredEntries returns the known built-in entry names, sorted.
+func DeclaredEntries() []string {
 	return slices.Sorted(maps.Keys(builtins))
 }
 

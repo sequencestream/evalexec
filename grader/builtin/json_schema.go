@@ -8,7 +8,6 @@ import (
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/grader/declaration"
 )
 
 // maxSchemaViolations caps how many violations reach the evidence list. A
@@ -17,7 +16,7 @@ import (
 const maxSchemaViolations = 10
 
 func init() {
-	grader.Register(declaration.EntryJSONSchema, newJSONSchema)
+	grader.Register(grader.EntryJSONSchema, newJSONSchema)
 }
 
 type jsonSchemaGrader struct {
@@ -27,7 +26,7 @@ type jsonSchemaGrader struct {
 // newJSONSchema builds the Grader. The schema was already compiled once during
 // the pre-check.
 func newJSONSchema(spec evalspec.GraderSpec, _ grader.Deps) (grader.Grader, error) {
-	s, err := declaration.CompileSchema(spec.Parameters)
+	s, err := grader.CompileSchema(spec.Parameters)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +35,7 @@ func newJSONSchema(spec evalspec.GraderSpec, _ grader.Deps) (grader.Grader, erro
 }
 
 func (g *jsonSchemaGrader) Declare() grader.Declaration {
-	d, _ := declaration.Lookup(declaration.EntryJSONSchema)
+	d, _ := grader.LookupDeclaration(grader.EntryJSONSchema)
 
 	return d
 }

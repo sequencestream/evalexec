@@ -12,7 +12,6 @@ import (
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/grader/declaration"
 )
 
 // maxResponseBytes caps an external Grader's response at 32 MB, matching the
@@ -60,7 +59,7 @@ func NewHTTPJSON(spec evalspec.GraderSpec, concurrency int) (grader.Grader, erro
 
 // Declare reports what the configuration says this Grader needs.
 func (g *HTTPJSON) Declare() grader.Declaration {
-	return declaration.Declaration{
+	return grader.Declaration{
 		Entry:         g.endpoint,
 		Requires:      g.requires,
 		RequiresJudge: g.spec.RequiresJudge,

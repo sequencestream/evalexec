@@ -9,7 +9,7 @@ import (
 
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/evalspec"
-	"github.com/sequencestream/evalexec/grader/declaration"
+	"github.com/sequencestream/evalexec/grader"
 	"github.com/sequencestream/evalexec/validate"
 )
 
@@ -477,7 +477,7 @@ func TestUndeclaredParamsAreNotPoliced(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			decl := declaration.Declaration{
+			decl := grader.Declaration{
 				Entry:    "custom",
 				Requires: []evalspec.SessionField{evalspec.FieldInput},
 				Params:   tt.params,

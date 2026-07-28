@@ -1,4 +1,4 @@
-package declaration
+package grader
 
 import (
 	"errors"

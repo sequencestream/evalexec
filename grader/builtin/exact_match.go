@@ -8,14 +8,13 @@ import (
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/grader/declaration"
 )
 
 // DefaultReferencePath is where exact_match looks for the expected value.
 const DefaultReferencePath = "$.expected_output"
 
 func init() {
-	grader.Register(declaration.EntryExactMatch, newExactMatch)
+	grader.Register(grader.EntryExactMatch, newExactMatch)
 }
 
 type exactMatch struct {
@@ -32,7 +31,7 @@ func newExactMatch(spec evalspec.GraderSpec, _ grader.Deps) (grader.Grader, erro
 }
 
 func (g *exactMatch) Declare() grader.Declaration {
-	d, _ := declaration.Lookup(declaration.EntryExactMatch)
+	d, _ := grader.LookupDeclaration(grader.EntryExactMatch)
 
 	return d
 }

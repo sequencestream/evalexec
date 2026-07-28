@@ -7,14 +7,13 @@ import (
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/grader/declaration"
 )
 
 // DefaultContainsPath is where contains looks for the expected substrings.
 const DefaultContainsPath = "$.expected_contains"
 
 func init() {
-	grader.Register(declaration.EntryContains, newContains)
+	grader.Register(grader.EntryContains, newContains)
 }
 
 type contains struct {
@@ -37,7 +36,7 @@ func newContains(spec evalspec.GraderSpec, _ grader.Deps) (grader.Grader, error)
 }
 
 func (g *contains) Declare() grader.Declaration {
-	d, _ := declaration.Lookup(declaration.EntryContains)
+	d, _ := grader.LookupDeclaration(grader.EntryContains)
 
 	return d
 }

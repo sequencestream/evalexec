@@ -7,11 +7,10 @@ import (
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/grader/declaration"
 )
 
 func init() {
-	grader.Register(declaration.EntryRegex, newRegex)
+	grader.Register(grader.EntryRegex, newRegex)
 }
 
 type regexGrader struct {
@@ -23,7 +22,7 @@ type regexGrader struct {
 // the pre-check, so a failure here would mean the configuration changed
 // underneath us.
 func newRegex(spec evalspec.GraderSpec, _ grader.Deps) (grader.Grader, error) {
-	re, source, err := declaration.CompilePattern(spec.Parameters)
+	re, source, err := grader.CompilePattern(spec.Parameters)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +31,7 @@ func newRegex(spec evalspec.GraderSpec, _ grader.Deps) (grader.Grader, error) {
 }
 
 func (g *regexGrader) Declare() grader.Declaration {
-	d, _ := declaration.Lookup(declaration.EntryRegex)
+	d, _ := grader.LookupDeclaration(grader.EntryRegex)
 
 	return d
 }

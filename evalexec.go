@@ -45,7 +45,6 @@ import (
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
 	_ "github.com/sequencestream/evalexec/grader/builtin" // register the built-in Graders
-	"github.com/sequencestream/evalexec/grader/declaration"
 	"github.com/sequencestream/evalexec/grader/external"
 	"github.com/sequencestream/evalexec/judge"
 	"github.com/sequencestream/evalexec/judge/transport"
@@ -182,21 +181,21 @@ type graderResolver struct {
 	registry *grader.Registry
 }
 
-func (r *graderResolver) Resolve(spec evalspec.GraderSpec) (declaration.Declaration, error) {
+func (r *graderResolver) Resolve(spec evalspec.GraderSpec) (grader.Declaration, error) {
 	// An external Grader's declaration comes from its configuration; there is
 	// nothing to ask, and asking would mean contacting the process the
 	// pre-check exists to validate before contacting.
 	if spec.Protocol != evalspec.GraderBuiltin {
-		return declaration.Declaration{}, validate.ErrUnknownEntry
+		return grader.Declaration{}, validate.ErrUnknownEntry
 	}
 
 	decl, err := r.registry.Resolve(spec, grader.Deps{})
 	if err != nil {
 		if errors.Is(err, grader.ErrUnknownEntry) {
-			return declaration.Declaration{}, fmt.Errorf("%w: %q", validate.ErrUnknownEntry, spec.Entry)
+			return grader.Declaration{}, fmt.Errorf("%w: %q", validate.ErrUnknownEntry, spec.Entry)
 		}
 
-		return declaration.Declaration{}, err
+		return grader.Declaration{}, err
 	}
 
 	return decl, nil

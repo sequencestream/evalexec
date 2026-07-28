@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/sequencestream/evalexec/evalspec"
-	"github.com/sequencestream/evalexec/grader/declaration"
+	"github.com/sequencestream/evalexec/grader"
 )
 
 // Evidence source names, matching the session field a cited value came from.
@@ -147,8 +147,8 @@ func parseIndex(s string) (int, error) {
 // says which parameters exist, so the pre-check and the Grader cannot disagree
 // about how a value is read.
 var (
-	stringParam = declaration.StringParam
-	boolParam   = declaration.BoolParam
+	stringParam = grader.StringParam
+	boolParam   = grader.BoolParam
 )
 
 // evidenceOf builds one evidence entry, decoding the raw value so the result

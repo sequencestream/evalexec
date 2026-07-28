@@ -25,13 +25,8 @@ import (
 	"sync"
 
 	"github.com/sequencestream/evalexec/evalspec"
-	"github.com/sequencestream/evalexec/grader/declaration"
 	"github.com/sequencestream/evalexec/judge"
 )
-
-// Declaration is re-exported so implementers need not import a second package
-// to satisfy the interface.
-type Declaration = declaration.Declaration
 
 // Grader evaluates one session.
 type Grader interface {
@@ -177,10 +172,10 @@ func (r *Registry) Build(spec evalspec.GraderSpec, deps Deps) (Grader, error) {
 // it unconstructible — an uncompilable pattern, a malformed schema — should
 // fail before the run starts rather than on the first sample and then on every
 // one after it.
-func (r *Registry) Resolve(spec evalspec.GraderSpec, deps Deps) (declaration.Declaration, error) {
+func (r *Registry) Resolve(spec evalspec.GraderSpec, deps Deps) (Declaration, error) {
 	g, err := r.Build(spec, deps)
 	if err != nil {
-		return declaration.Declaration{}, err
+		return Declaration{}, err
 	}
 
 	return g.Declare(), nil

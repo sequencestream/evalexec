@@ -28,7 +28,7 @@ import (
 	"github.com/sequencestream/evalexec/dataset"
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/evalspec"
-	"github.com/sequencestream/evalexec/grader/declaration"
+	"github.com/sequencestream/evalexec/grader"
 )
 
 // The six pre-check step names, in the order they run. They are reported in
@@ -64,7 +64,7 @@ type JudgeChecker interface {
 // table. Without this, the extension point would be validated out of
 // existence.
 type GraderResolver interface {
-	Resolve(spec evalspec.GraderSpec) (declaration.Declaration, error)
+	Resolve(spec evalspec.GraderSpec) (grader.Declaration, error)
 }
 
 // ErrUnknownEntry is what a resolver returns to mean "not mine", as opposed to
@@ -96,7 +96,7 @@ type Report struct {
 	Requires []evalspec.SessionField
 	// Declaration is the resolved built-in Grader declaration, or nil for an
 	// external protocol.
-	Declaration *declaration.Declaration
+	Declaration *grader.Declaration
 }
 
 // All runs the six pre-checks in their fixed order and stops at the first
@@ -182,7 +182,7 @@ func checkOutputDir(dir string) error {
 func checkGraderDeclaration(
 	g *evalspec.GraderSpec,
 	resolver GraderResolver,
-) (*declaration.Declaration, []evalspec.SessionField, error) {
+) (*grader.Declaration, []evalspec.SessionField, error) {
 	if g.Protocol != evalspec.GraderBuiltin {
 		return nil, g.Requires, nil
 	}
@@ -219,7 +219,7 @@ func checkGraderDeclaration(
 // resolveDeclaration finds what the configured Grader declares, preferring the
 // registry over the built-in table so custom entries are validated on their
 // own terms.
-func resolveDeclaration(g *evalspec.GraderSpec, resolver GraderResolver) (declaration.Declaration, error) {
+func resolveDeclaration(g *evalspec.GraderSpec, resolver GraderResolver) (grader.Declaration, error) {
 	if resolver != nil {
 		decl, err := resolver.Resolve(*g)
 		if err == nil {
@@ -230,16 +230,16 @@ func resolveDeclaration(g *evalspec.GraderSpec, resolver GraderResolver) (declar
 		// unregistered; a Grader that is registered but refused to build is a
 		// real configuration error and must be reported as one.
 		if !errors.Is(err, ErrUnknownEntry) {
-			return declaration.Declaration{}, evalerr.Wrap(evalerr.KindPrecheck, StepGraderDeclaration, err,
+			return grader.Declaration{}, evalerr.Wrap(evalerr.KindPrecheck, StepGraderDeclaration, err,
 				"grader %q cannot be configured", g.Entry)
 		}
 	}
 
-	decl, ok := declaration.Lookup(g.Entry)
+	decl, ok := grader.LookupDeclaration(g.Entry)
 	if !ok {
-		return declaration.Declaration{}, evalerr.Precheck(StepGraderDeclaration,
+		return grader.Declaration{}, evalerr.Precheck(StepGraderDeclaration,
 			"unknown builtin grader entry %q; known entries are %s",
-			g.Entry, strings.Join(declaration.Entries(), ", "))
+			g.Entry, strings.Join(grader.DeclaredEntries(), ", "))
 	}
 
 	return decl, nil

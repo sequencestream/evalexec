@@ -9,7 +9,6 @@ import (
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/grader/declaration"
 	"github.com/sequencestream/evalexec/judge"
 	"github.com/sequencestream/evalexec/judge/transport"
 )
@@ -33,7 +32,7 @@ type JudgeFactory func() (judge.Judge, error)
 // wrong step and with the wrong exit path. Grading with a nil Judge is caught
 // in Grade.
 func NewLLMJudge(spec evalspec.GraderSpec, j judge.Judge) (grader.Grader, error) {
-	rubric, err := declaration.StringParam(spec.Parameters, "rubric", "")
+	rubric, err := grader.StringParam(spec.Parameters, "rubric", "")
 	if err != nil {
 		return nil, err
 	}
@@ -42,17 +41,17 @@ func NewLLMJudge(spec evalspec.GraderSpec, j judge.Judge) (grader.Grader, error)
 		return nil, errors.New(`llm_judge: parameter "rubric" is required`)
 	}
 
-	useReference, err := declaration.BoolParam(spec.Parameters, "use_reference", false)
+	useReference, err := grader.BoolParam(spec.Parameters, "use_reference", false)
 	if err != nil {
 		return nil, err
 	}
 
-	useTrajectory, err := declaration.BoolParam(spec.Parameters, "use_trajectory", false)
+	useTrajectory, err := grader.BoolParam(spec.Parameters, "use_trajectory", false)
 	if err != nil {
 		return nil, err
 	}
 
-	structured, err := declaration.BoolParam(spec.Parameters, "structured_output", false)
+	structured, err := grader.BoolParam(spec.Parameters, "structured_output", false)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +74,7 @@ type llmJudge struct {
 }
 
 func (g *llmJudge) Declare() grader.Declaration {
-	d, _ := declaration.Lookup(declaration.EntryLLMJudge)
+	d, _ := grader.LookupDeclaration(grader.EntryLLMJudge)
 
 	return d
 }
@@ -346,7 +345,7 @@ func writeField(b *strings.Builder, name string, raw json.RawMessage) {
 }
 
 func init() {
-	grader.Register(declaration.EntryLLMJudge, newLLMJudgeFromDeps)
+	grader.Register(grader.EntryLLMJudge, newLLMJudgeFromDeps)
 }
 
 // newLLMJudgeFromDeps is the registry factory. The Judge arrives through Deps
