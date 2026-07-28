@@ -9,7 +9,7 @@ import (
 
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
-	"github.com/sequencestream/evalexec/subprocess"
+	"github.com/sequencestream/evalexec/internal/subprocess"
 )
 
 // StdioJSONL grades by exchanging one JSON line with a subprocess.

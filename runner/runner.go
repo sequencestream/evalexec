@@ -24,12 +24,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sequencestream/evalexec/dataset"
+	"github.com/sequencestream/evalexec/internal/dataset"
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
 	"github.com/sequencestream/evalexec/judge/transport"
-	"github.com/sequencestream/evalexec/summary"
+	"github.com/sequencestream/evalexec/internal/summary"
 )
 
 // StepRun is the step name reported for run-level faults.

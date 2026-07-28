@@ -3,7 +3,7 @@ package version_test
 import (
 	"testing"
 
-	"github.com/sequencestream/evalexec/version"
+	"github.com/sequencestream/evalexec/internal/version"
 )
 
 // TestStringOmitsPlaceholders covers the four combinations of stamped and

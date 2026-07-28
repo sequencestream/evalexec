@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/sequencestream/evalexec/evalspec"
-	"github.com/sequencestream/evalexec/summary"
+	"github.com/sequencestream/evalexec/internal/summary"
 )
 
 func f64(v float64) *float64 { return &v }

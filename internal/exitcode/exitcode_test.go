@@ -7,7 +7,7 @@ import (
 
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/evalspec"
-	"github.com/sequencestream/evalexec/exitcode"
+	"github.com/sequencestream/evalexec/internal/exitcode"
 )
 
 func TestFromError(t *testing.T) {

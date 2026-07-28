@@ -48,12 +48,12 @@ import (
 	"github.com/sequencestream/evalexec/grader/external"
 	"github.com/sequencestream/evalexec/judge"
 	"github.com/sequencestream/evalexec/judge/transport"
-	"github.com/sequencestream/evalexec/redact"
+	"github.com/sequencestream/evalexec/internal/redact"
 	"github.com/sequencestream/evalexec/result"
 	"github.com/sequencestream/evalexec/runner"
-	"github.com/sequencestream/evalexec/summary"
+	"github.com/sequencestream/evalexec/internal/summary"
 	"github.com/sequencestream/evalexec/validate"
-	"github.com/sequencestream/evalexec/version"
+	"github.com/sequencestream/evalexec/internal/version"
 )
 
 // StepRun is the step name reported for run-level faults.

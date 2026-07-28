@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sequencestream/evalexec/dataset"
+	"github.com/sequencestream/evalexec/internal/dataset"
 	"github.com/sequencestream/evalexec/evalspec"
 )
 

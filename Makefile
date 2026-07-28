@@ -8,9 +8,9 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
 LDFLAGS := -s -w \
-	-X '$(MODULE)/version.Version=$(VERSION)' \
-	-X '$(MODULE)/version.Commit=$(COMMIT)' \
-	-X '$(MODULE)/version.Date=$(DATE)'
+	-X '$(MODULE)/internal/version.Version=$(VERSION)' \
+	-X '$(MODULE)/internal/version.Commit=$(COMMIT)' \
+	-X '$(MODULE)/internal/version.Date=$(DATE)'
 
 # Direct non-stdlib dependencies allowed in go.mod: aimodel plus one JSON
 # Schema library, and that budget is now spent.

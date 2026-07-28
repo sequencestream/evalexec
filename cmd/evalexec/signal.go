@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/sequencestream/evalexec/exitcode"
+	"github.com/sequencestream/evalexec/internal/exitcode"
 )
 
 // interruptsBeforeForcedExit is how many signals are honoured before the

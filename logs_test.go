@@ -15,7 +15,7 @@ import (
 
 	evalexec "github.com/sequencestream/evalexec"
 	"github.com/sequencestream/evalexec/evalspec"
-	"github.com/sequencestream/evalexec/redact"
+	"github.com/sequencestream/evalexec/internal/redact"
 	"github.com/sequencestream/evalexec/result"
 )
 

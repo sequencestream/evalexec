@@ -26,7 +26,7 @@ import (
 	"github.com/vogo/aimodel/ais"
 
 	"github.com/sequencestream/evalexec/judge/provider/httpjson"
-	"github.com/sequencestream/evalexec/subprocess"
+	"github.com/sequencestream/evalexec/internal/subprocess"
 )
 
 // Name is the registered provider name.

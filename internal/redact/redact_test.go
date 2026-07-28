@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/sequencestream/evalexec/evalspec"
-	"github.com/sequencestream/evalexec/redact"
+	"github.com/sequencestream/evalexec/internal/redact"
 )
 
 func validRequest() *evalspec.EvalRequest {

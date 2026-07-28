@@ -17,7 +17,7 @@ import (
 	"github.com/sequencestream/evalexec/grader"
 	"github.com/sequencestream/evalexec/grader/builtin"
 	"github.com/sequencestream/evalexec/judge"
-	"github.com/sequencestream/evalexec/redact"
+	"github.com/sequencestream/evalexec/internal/redact"
 	"github.com/sequencestream/evalexec/result"
 )
 

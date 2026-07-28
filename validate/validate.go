@@ -25,7 +25,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/sequencestream/evalexec/dataset"
+	"github.com/sequencestream/evalexec/internal/dataset"
 	"github.com/sequencestream/evalexec/evalerr"
 	"github.com/sequencestream/evalexec/evalspec"
 	"github.com/sequencestream/evalexec/grader"
